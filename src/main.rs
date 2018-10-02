@@ -1,5 +1,6 @@
 extern crate atomic;
 extern crate clap;
+extern crate crossbeam;
 extern crate fern;
 #[macro_use]
 extern crate im;

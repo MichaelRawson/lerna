@@ -173,6 +173,7 @@ pub fn load(path: &str, core: &Core) -> Result<Goal, LoadError> {
     let mut formulae = Set::new();
     for input in reader {
         let (_file, _position, statement) = input.map_err(convert_error)?;
+        debug!("{}", statement);
         let statement = load_statement(core, statement)?;
         formulae.insert(statement);
     }

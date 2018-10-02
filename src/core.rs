@@ -54,6 +54,10 @@ pub struct Goal {
 }
 
 impl Goal {
+    pub fn new(formulae: Set<Arc<Formula>>) -> Goal {
+        Goal {formulae}
+    }
+
     pub fn complete(&self) -> bool {
         self.formulae.contains(&Formula::F)
     }

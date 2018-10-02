@@ -46,6 +46,7 @@ impl GoalNode {
 
     fn select(&self, top_distance: u16) -> Option<Arc<Self>> {
         if self.check_complete() {
+            warn!("selecting complete node");
             return None;
         }
 
@@ -93,6 +94,7 @@ impl GoalNode {
 
     fn expand(&self) -> bool {
         if self.check_complete() {
+            warn!("expanding complete node");
             return false;
         }
         let mut locked = self.locked.write();
@@ -101,7 +103,10 @@ impl GoalNode {
                 .into_iter()
                 .map(InferenceNode::new)
                 .collect(),
-            GoalNodeContent::Branch(_) => return false,
+            GoalNodeContent::Branch(_) => {
+                warn!("already expanded");
+                return false;
+            },
         };
         *locked = GoalNodeContent::Branch(children);
         true
@@ -111,7 +116,7 @@ impl GoalNode {
         let locked = self.locked.read();
         let children: &Vec<Box<InferenceNode>> = match *locked {
             GoalNodeContent::Branch(ref x) => &x,
-            GoalNodeContent::Leaf => panic!("updating a leaf node"),
+            GoalNodeContent::Leaf => return,
         };
         for child in children {
             child.update();
@@ -220,11 +225,11 @@ impl Tree {
             stack.push(current);
             current = next;
         }
+        stack.push(current.clone());
 
         // expand
         if !current.expand() {
-            trace!("contention while expanding tree");
-            return;
+           return;
         }
 
         // update

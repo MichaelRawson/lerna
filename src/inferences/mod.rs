@@ -1,10 +1,13 @@
+mod complete;
+
 use core::*;
 use simplifications::simplify;
 
 pub type Inferred = Set<Goal>;
 
-fn all_inferences(_goal: Goal) -> Set<Inferred> {
-    set![]
+fn all_inferences(goal: Goal) -> Set<Inferred> {
+    let complete = complete::complete(goal.clone());
+    complete
 }
 
 fn inferences(goal: Goal) -> Set<Inferred> {
@@ -28,6 +31,6 @@ pub fn infer(goal: Goal) -> Set<Inferred> {
                 .map(|x| simplify(x))
                 .collect::<Inferred>()
         }).collect();
-    trace!("{} inferences found", result.len());
+    trace!("inferred: {:?}", result);
     result
 }
