@@ -8,6 +8,7 @@ fn simplify_step(goal: Goal) -> Goal {
 }
 
 pub fn simplify(goal: Goal) -> Goal {
+    trace!("simplify {:?}", goal.formulae);
     let mut current = goal;
     loop {
         let next = simplify_step(current.clone());
@@ -16,6 +17,7 @@ pub fn simplify(goal: Goal) -> Goal {
         }
         current = next;
     }
+    trace!("simplified to {:?}", current.formulae);
 
     current
 }

@@ -3,8 +3,8 @@ use std::vec::Vec;
 
 use atomic::Atomic;
 use atomic::Ordering::Relaxed;
-use parking_lot::RwLock;
 use im;
+use parking_lot::RwLock;
 
 use options::CoreOptions;
 use util::BiMap;
@@ -24,7 +24,7 @@ pub struct Symbol(usize);
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Term {
     Var(Bound),
-    Fun(Symbol, Vec<Arc<Term>>)
+    Fun(Symbol, Vec<Arc<Term>>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -50,7 +50,7 @@ impl Formula {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Goal {
-    pub formulae: Set<Arc<Formula>>
+    pub formulae: Set<Arc<Formula>>,
 }
 
 impl Goal {
@@ -61,14 +61,14 @@ impl Goal {
 
 pub struct Core {
     fresh: Atomic<usize>,
-    symbols: RwLock<BiMap<(Arc<String>, usize), Symbol>>
+    symbols: RwLock<BiMap<(Arc<String>, usize), Symbol>>,
 }
 
 impl Core {
     pub fn new(_options: &CoreOptions) -> Self {
         let core = Core {
             fresh: Atomic::new(0),
-            symbols: RwLock::new(BiMap::new())
+            symbols: RwLock::new(BiMap::new()),
         };
 
         debug!("core initialised");
@@ -86,7 +86,9 @@ impl Core {
 
         {
             match symbols.forward(&entry) {
-                Some(symbol) => { return *symbol; },
+                Some(symbol) => {
+                    return *symbol;
+                }
                 None => {}
             }
         }

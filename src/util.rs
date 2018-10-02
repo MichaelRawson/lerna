@@ -1,11 +1,5 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::process::exit;
-
-pub fn fail() -> ! {
-    info!("exiting with failure status");
-    exit(1)
-}
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Score(pub f64);
@@ -21,7 +15,11 @@ impl Eq for Score {}
 
 impl PartialOrd for Score {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.0.partial_cmp(&other.0).expect("score is not finite IEEE"))
+        Some(
+            self.0
+                .partial_cmp(&other.0)
+                .expect("score is not finite IEEE"),
+        )
     }
 }
 
@@ -32,19 +30,23 @@ impl Ord for Score {
 }
 
 pub struct BiMap<A, B>
-    where A: Clone + Ord, B: Clone + Ord
+where
+    A: Clone + Ord,
+    B: Clone + Ord,
 {
     forward: BTreeMap<A, B>,
-    back: BTreeMap<B, A>
+    back: BTreeMap<B, A>,
 }
 
 impl<A, B> BiMap<A, B>
-    where A: Clone + Ord, B: Clone + Ord
+where
+    A: Clone + Ord,
+    B: Clone + Ord,
 {
     pub fn new() -> Self {
         BiMap {
             forward: BTreeMap::new(),
-            back: BTreeMap::new()
+            back: BTreeMap::new(),
         }
     }
 
