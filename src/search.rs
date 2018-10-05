@@ -1,10 +1,13 @@
 use crossbeam::scope;
+use num_cpus;
 use time::{get_time, Duration, Timespec};
 
 use core::{Goal, Proof};
 use options::SearchOptions;
 use simplifications::simplify;
 use tree::Tree;
+
+const STACK_SIZE: usize = 10 * 1024 * 1024;
 
 pub enum SearchResult {
     TimeOut,
@@ -43,15 +46,22 @@ impl Search {
     }
 
     pub fn run(self) -> SearchResult {
+        let parallelism = num_cpus::get();
+        info!("running on {} logical core(s)", parallelism);
+
         scope(|scope| {
             let mut workers = vec![];
-            for index in 1..8 {
-                debug!("spawning worker {}", index);
-                workers.push(scope.spawn(|| self.work()));
+            for i in 0..parallelism {
+                debug!("spawning worker {}", i);
+                let builder = scope
+                    .builder()
+                    .name(format!("lerna-worker-{}", i))
+                    .stack_size(STACK_SIZE);
+                workers.push(builder.spawn(|| self.work()).expect("spawn failed"));
             }
-            for worker in workers {
-                debug!("waiting for worker {:?}", worker);
+            for (i, worker) in workers.into_iter().enumerate() {
                 worker.join().unwrap();
+                debug!("worker {} exited", i);
             }
         });
 

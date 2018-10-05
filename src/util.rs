@@ -97,6 +97,8 @@ pub fn weighted_choice(scores: &[f64]) -> usize {
 }
 
 pub fn assert_ownership<T>(ptr: Arc<T>) -> T
-    where T: Debug {
+where
+    T: Debug,
+{
     Arc::try_unwrap(ptr).expect("assumed owned")
 }

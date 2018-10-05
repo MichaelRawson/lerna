@@ -5,7 +5,10 @@ extern crate fern;
 #[macro_use]
 extern crate im;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
+extern crate num_cpus;
 extern crate parking_lot;
 extern crate rand;
 extern crate time;
@@ -13,9 +16,11 @@ extern crate tptp;
 
 #[macro_use]
 mod core;
+mod common;
 mod inferences;
 mod input;
 mod logging;
+mod names;
 mod options;
 mod output;
 mod search;
@@ -28,21 +33,19 @@ use std::process::exit;
 
 use time::get_time;
 
-use core::Names;
 use input::LoadError;
 use options::Options;
 use search::{Search, SearchResult};
 
 fn main() {
     let start_time = get_time();
-    let names = Names::new();
     let options = Options::parse();
     logging::setup(&options.logging);
 
     debug!("program started, start time was {:?}", start_time);
     info!("OK, running for {}s", &options.search.timeout);
     info!("loading from {:?}...", options.input.file);
-    let goal = input::load(&options.input, &names).unwrap_or_else(|err| {
+    let goal = input::load(&options.input).unwrap_or_else(|err| {
         match err {
             LoadError::OSError => output::os_error(&options.output),
             LoadError::InputError => output::input_error(&options.output),
@@ -68,7 +71,8 @@ fn main() {
             info!("...proof found");
             debug!("proof found, reporting...");
             let done = original.consume();
-            output::proof_found(&options.output, &names, done, &proof);
+            output::proof_found(&options.output, done, &proof);
+            info!("bye!");
             debug!("...proof succeeded, exit(0)");
             exit(0);
         }

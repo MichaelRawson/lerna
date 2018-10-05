@@ -51,12 +51,19 @@ impl GoalNode {
         self.atomic_complete.load(Relaxed)
     }
 
-    fn select(&self) -> Option<Arc<Self>> {
-        if self.complete() {
-            debug!("contention: selecting complete node");
-            return None;
+    fn step(&self) -> bool {
+        let selected = self.select();
+        let should_update = match selected {
+            Some(next) => next.step(),
+            None => self.expand(),
+        };
+        if should_update {
+            self.update();
         }
+        should_update
+    }
 
+    fn select(&self) -> Option<Arc<Self>> {
         let locked = self.lock.read();
         let inferences = match *locked {
             GoalNodeContent::Branch(ref inferences) => inferences,
@@ -77,9 +84,9 @@ impl GoalNode {
 
     fn expand(&self) -> bool {
         if self.complete() {
-            debug!("contention: expanding complete node");
             return false;
         }
+
         let mut locked = self.lock.write();
         let children = match *locked {
             GoalNodeContent::Leaf => infer(self.goal.clone())
@@ -87,7 +94,6 @@ impl GoalNode {
                 .map(InferenceNode::new)
                 .collect(),
             GoalNodeContent::Branch(_) => {
-                debug!("contention: expanding already-expanded node");
                 return false;
             }
         };
@@ -122,14 +128,15 @@ impl GoalNode {
         let goal = self.goal;
         let unlocked = self.lock.into_inner();
         match unlocked {
-            GoalNodeContent::Leaf => Box::new(Proof::leaf(goal)),
+            GoalNodeContent::Leaf => Box::new(Proof::leaf(&goal)),
             GoalNodeContent::Branch(inferences) => Box::new(Proof::branch(
                 goal,
-                inferences.into_iter()
+                inferences
+                    .into_iter()
                     .find(|x| x.complete())
                     .unwrap()
-                    .proofs()
-            ))
+                    .proofs(),
+            )),
         }
     }
 }
@@ -198,7 +205,8 @@ impl InferenceNode {
     }
 
     fn proofs(self) -> Vec<Box<Proof>> {
-        self.subgoals.into_iter()
+        self.subgoals
+            .into_iter()
             .map(assert_ownership)
             .map(|x| x.proof())
             .collect()
@@ -221,25 +229,7 @@ impl Tree {
     }
 
     pub fn step(&self) {
-        let mut stack: Vec<Arc<GoalNode>> = vec![];
-        let mut current = self.root.clone();
-
-        // select
-        while let Some(next) = current.clone().select() {
-            stack.push(current);
-            current = next;
-        }
-        stack.push(current.clone());
-
-        // expand
-        if !current.expand() {
-            return;
-        }
-
-        // update
-        while let Some(top) = stack.pop() {
-            top.update();
-        }
+        self.root.step();
     }
 
     pub fn proof(self) -> Box<Proof> {

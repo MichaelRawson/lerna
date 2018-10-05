@@ -12,7 +12,7 @@ impl LoggingOptionsVerbosity {
             "quiet" => LoggingOptionsVerbosity::Quiet,
             "normal" => LoggingOptionsVerbosity::Normal,
             "verbose" => LoggingOptionsVerbosity::Verbose,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
@@ -91,7 +91,7 @@ impl Options {
                     .takes_value(true)
                     .value_name("SECS")
                     .validator(|x| validate_seconds(&x))
-                    .default_value("60"),
+                    .default_value("30"),
             ).arg(
                 Arg::with_name("logging")
                     .long("logging")
@@ -100,7 +100,7 @@ impl Options {
                     .possible_value("quiet")
                     .possible_value("normal")
                     .possible_value("verbose")
-                    .default_value("normal")
+                    .default_value("normal"),
             ).get_matches();
 
         let logging = LoggingOptions::new(&matches);
