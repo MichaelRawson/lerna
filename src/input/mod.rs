@@ -1,6 +1,6 @@
 pub mod tptp;
 
-use core::{Core, Goal};
+use core::{Names, Goal};
 use options::InputOptions;
 
 pub enum LoadError {
@@ -9,6 +9,6 @@ pub enum LoadError {
     Unsupported,
 }
 
-pub fn load(options: &InputOptions, core: &Core) -> Result<Goal, LoadError> {
+pub fn load(options: &InputOptions, core: &Names) -> Result<Goal, LoadError> {
     tptp::load(&options.file, core)
 }

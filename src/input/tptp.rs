@@ -9,7 +9,7 @@ use core::*;
 use input::LoadError;
 
 fn load_fof_term(
-    core: &Core,
+    names: &Names,
     bound: &Map<ast::Bound, core::Bound>,
     term: &FofTerm,
 ) -> Result<Arc<Term>, LoadError> {
@@ -27,11 +27,11 @@ fn load_fof_term(
         FofTerm::Functor(name, fof_args) => {
             let name = Arc::new(format!("{}", name));
             let arity = fof_args.len();
-            let symbol = core.symbol_for(name, arity);
+            let symbol = names.symbol_for(name, arity);
 
             let mut args = vec![];
             for arg in fof_args {
-                args.push(load_fof_term(core, &bound, arg)?);
+                args.push(load_fof_term(names, &bound, arg)?);
             }
             Arc::new(Term::Fun(symbol, args))
         }
@@ -39,36 +39,36 @@ fn load_fof_term(
 }
 
 fn load_fof_formula(
-    core: &Core,
+    names: &Names,
     mut bound: Map<ast::Bound, core::Bound>,
     formula: &FofFormula,
 ) -> Result<Arc<Formula>, LoadError> {
     Ok(match formula {
         FofFormula::Boolean(b) => Arc::new(if *b { Formula::T } else { Formula::F }),
         FofFormula::Equal(x, y) => Arc::new(Formula::Eql(
-            load_fof_term(core, &bound, x)?,
-            load_fof_term(core, &bound, y)?,
+            load_fof_term(names, &bound, x)?,
+            load_fof_term(names, &bound, y)?,
         )),
         FofFormula::Predicate(name, fof_args) => {
             let name = Arc::new(format!("{}", name));
             let arity = fof_args.len();
-            let symbol = core.symbol_for(name, arity);
+            let symbol = names.symbol_for(name, arity);
 
             let mut args = vec![];
             for arg in fof_args {
-                args.push(load_fof_term(core, &bound, arg)?);
+                args.push(load_fof_term(names, &bound, arg)?);
             }
             Arc::new(Formula::Prd(symbol, args))
         }
         FofFormula::Unary(op, f) => {
-            let f = load_fof_formula(core, bound.clone(), f)?;
+            let f = load_fof_formula(names, bound.clone(), f)?;
             Arc::new(match op {
                 FofUnaryOp::Not => Formula::Not(f),
             })
         }
         FofFormula::NonAssoc(op, left, right) => {
-            let left = load_fof_formula(core, bound.clone(), left)?;
-            let right = load_fof_formula(core, bound.clone(), right)?;
+            let left = load_fof_formula(names, bound.clone(), left)?;
+            let right = load_fof_formula(names, bound.clone(), right)?;
             Arc::new(match op {
                 FofNonAssocOp::Implies => Formula::Imp(left, right),
                 FofNonAssocOp::Equivalent => Formula::Eqv(left, right),
@@ -77,7 +77,7 @@ fn load_fof_formula(
         FofFormula::Assoc(op, fof_args) => {
             let mut args = set![];
             for arg in fof_args {
-                args.insert(load_fof_formula(core, bound.clone(), arg)?);
+                args.insert(load_fof_formula(names, bound.clone(), arg)?);
             }
             Arc::new(match op {
                 FofAssocOp::And => Formula::And(args),
@@ -92,24 +92,24 @@ fn load_fof_formula(
             let binders: Vec<core::Bound> = binders
                 .iter()
                 .map(|x| {
-                    let x_bound = core.fresh_binder();
+                    let x_bound = names.fresh_binder();
                     bound.insert(x.clone(), x_bound);
                     x_bound
                 }).rev()
                 .collect();
-            let f = load_fof_formula(core, bound, f)?;
+            let f = load_fof_formula(names, bound, f)?;
             binders.iter().fold(f, |f, x| Arc::new(quantifier(*x, f)))
         }
     })
 }
 
 fn load_fof(
-    core: &Core,
+    names: &Names,
     role: FormulaRole,
     formula: &FofFormula,
 ) -> Result<Arc<Formula>, LoadError> {
     let bound = Map::new();
-    let formula = load_fof_formula(core, bound, formula)?;
+    let formula = load_fof_formula(names, bound, formula)?;
     match role {
         FormulaRole::Axiom | FormulaRole::Hypothesis | FormulaRole::NegatedConjecture => {
             Ok(formula)
@@ -122,11 +122,11 @@ fn load_fof(
     }
 }
 
-fn load_statement(core: &Core, statement: Statement) -> Result<Arc<Formula>, LoadError> {
+fn load_statement(names: &Names, statement: Statement) -> Result<Arc<Formula>, LoadError> {
     match statement {
         Statement::Fof(name, role, formula) => {
             debug!("parsed TPTP input \"{}\"", name);
-            let formula = load_fof(core, role, &formula)?;
+            let formula = load_fof(names, role, &formula)?;
             debug!("loaded \"{}\"", name);
             Ok(formula)
         }
@@ -163,7 +163,7 @@ fn convert_error(e: Error) -> LoadError {
     }
 }
 
-pub fn load(path: &str, core: &Core) -> Result<Goal, LoadError> {
+pub fn load(path: &str, names: &Names) -> Result<Goal, LoadError> {
     debug!("parsing TPTP from {:?}...", path);
     let reader = ReaderBuilder::new()
         .follow_includes()
@@ -174,11 +174,10 @@ pub fn load(path: &str, core: &Core) -> Result<Goal, LoadError> {
     for input in reader {
         let (_file, _position, statement) = input.map_err(convert_error)?;
         debug!("{}", statement);
-        let statement = load_statement(core, statement)?;
+        let statement = load_statement(names, statement)?;
         formulae.insert(statement);
     }
     debug!("...parsing done");
 
-    let goal = Goal { formulae };
-    Ok(goal)
+    Ok(Goal::new(formulae))
 }

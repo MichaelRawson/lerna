@@ -5,16 +5,18 @@ use atomic::Atomic;
 use atomic::Ordering::Relaxed;
 use parking_lot::RwLock;
 
-use core::{Formula, Goal, Set};
+use core::{Goal, Proof, Set};
 use inferences::infer;
 use uct::uct;
-use util::{equal_choice, weighted_choice};
+use util::{assert_ownership, equal_choice, weighted_choice};
 
+#[derive(Debug)]
 enum GoalNodeContent {
     Leaf,
     Branch(Vec<Box<InferenceNode>>),
 }
 
+#[derive(Debug)]
 struct GoalNode {
     goal: Goal,
     lock: RwLock<GoalNodeContent>,
@@ -51,7 +53,7 @@ impl GoalNode {
 
     fn select(&self) -> Option<Arc<Self>> {
         if self.complete() {
-            warn!("selecting complete node");
+            debug!("contention: selecting complete node");
             return None;
         }
 
@@ -75,7 +77,7 @@ impl GoalNode {
 
     fn expand(&self) -> bool {
         if self.complete() {
-            warn!("contention: expanding complete node");
+            debug!("contention: expanding complete node");
             return false;
         }
         let mut locked = self.lock.write();
@@ -116,28 +118,23 @@ impl GoalNode {
         self.atomic_distance.store(distance, Relaxed);
     }
 
-    fn proof(&self, mut done: Set<Arc<Formula>>, proof: &mut Vec<Arc<Formula>>) {
-        let locked = self.lock.read();
-        match *locked {
-            GoalNodeContent::Leaf => {
-                proof.push(Arc::new(Formula::F));
-            }
-            GoalNodeContent::Branch(ref inferences) => {
-                for f in &self.goal.formulae {
-                    if !done.contains(f) {
-                        proof.push(f.clone());
-                        done.insert(f.clone());
-                    }
-                }
-
-                let inference = inferences.iter().find(|x| x.complete()).unwrap();
-
-                inference.proof(&done, proof);
-            }
+    fn proof(self) -> Box<Proof> {
+        let goal = self.goal;
+        let unlocked = self.lock.into_inner();
+        match unlocked {
+            GoalNodeContent::Leaf => Box::new(Proof::leaf(goal)),
+            GoalNodeContent::Branch(inferences) => Box::new(Proof::branch(
+                goal,
+                inferences.into_iter()
+                    .find(|x| x.complete())
+                    .unwrap()
+                    .proofs()
+            ))
         }
     }
 }
 
+#[derive(Debug)]
 struct InferenceNode {
     subgoals: Vec<Arc<GoalNode>>,
     atomic_visits: Atomic<usize>,
@@ -200,10 +197,11 @@ impl InferenceNode {
         self.atomic_distance.store(distance, Relaxed);
     }
 
-    fn proof(&self, done: &Set<Arc<Formula>>, proof: &mut Vec<Arc<Formula>>) {
-        for subgoal in &self.subgoals {
-            subgoal.proof(done.clone(), proof);
-        }
+    fn proofs(self) -> Vec<Box<Proof>> {
+        self.subgoals.into_iter()
+            .map(assert_ownership)
+            .map(|x| x.proof())
+            .collect()
     }
 }
 
@@ -244,9 +242,10 @@ impl Tree {
         }
     }
 
-    pub fn proof(&self, done: Set<Arc<Formula>>, proof: &mut Vec<Arc<Formula>>) {
+    pub fn proof(self) -> Box<Proof> {
         assert!(self.complete());
-        self.root.proof(done, proof);
+        let root = assert_ownership(self.root);
+        root.proof()
     }
 
     pub fn total_visits(&self) -> usize {

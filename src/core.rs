@@ -6,7 +6,6 @@ use atomic::Ordering::Relaxed;
 use im;
 use parking_lot::RwLock;
 
-use options::CoreOptions;
 use util::BiMap;
 
 pub type Set<T> = im::OrdSet<T>;
@@ -50,33 +49,62 @@ impl Formula {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Goal {
-    pub formulae: Set<Arc<Formula>>,
+    refute: Set<Arc<Formula>>,
 }
 
 impl Goal {
-    pub fn new(formulae: Set<Arc<Formula>>) -> Goal {
-        Goal { formulae }
+    pub fn new(refute: Set<Arc<Formula>>) -> Self {
+        Goal { refute }
+    }
+
+    pub fn with(&self, f: Arc<Formula>) -> Self {
+        Goal::new(self.refute.update(f))
+    }
+
+    pub fn contains(&self, f: &Formula) -> bool {
+        self.refute.contains(f)
     }
 
     pub fn complete(&self) -> bool {
-        self.formulae.contains(&Formula::F)
+        self.refute.contains(&Formula::F)
+    }
+
+    pub fn formulae(&self) -> impl Iterator<Item=&Arc<Formula>> {
+        self.refute.iter()
+    }
+
+    pub fn consume(self) -> Set<Arc<Formula>> {
+        self.refute
     }
 }
 
-pub struct Core {
+pub enum Proof {
+    Leaf,
+    Branch(Set<Arc<Formula>>, Vec<Box<Proof>>)
+}
+
+impl Proof {
+    pub fn leaf(goal: Goal) -> Self {
+        assert!(goal.complete(), "proof leaves must have complete goals");
+        Proof::Leaf
+    }
+
+    pub fn branch(goal: Goal, children: Vec<Box<Proof>>) -> Self {
+        Proof::Branch(goal.consume(), children)
+    }
+}
+
+pub struct Names {
     fresh: Atomic<usize>,
     symbols: RwLock<BiMap<(Arc<String>, usize), Symbol>>,
 }
 
-impl Core {
-    pub fn new(_options: &CoreOptions) -> Self {
-        let core = Core {
+impl Names {
+    pub fn new() -> Self {
+        Names {
             fresh: Atomic::new(0),
             symbols: RwLock::new(BiMap::new()),
-        };
-
-        debug!("core initialised");
-        core
+        }
     }
 
     pub fn fresh_binder(&self) -> Bound {
@@ -97,7 +125,7 @@ impl Core {
         symbol
     }
 
-    pub fn name_of_symbol(&self, symbol: Symbol) -> Arc<String> {
+    pub fn symbol_name(&self, symbol: Symbol) -> Arc<String> {
         self.symbols.read().back(&symbol).unwrap().0.clone()
     }
 }

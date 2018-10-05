@@ -28,23 +28,21 @@ use std::process::exit;
 
 use time::get_time;
 
-use core::Core;
+use core::Names;
 use input::LoadError;
 use options::Options;
 use search::{Search, SearchResult};
 
 fn main() {
     let start_time = get_time();
-
+    let names = Names::new();
     let options = Options::parse();
     logging::setup(&options.logging);
-    debug!("start time was {:?}", start_time);
 
-    let core = Core::new(&options.core);
-
+    debug!("program started, start time was {:?}", start_time);
     info!("OK, running for {}s", &options.search.timeout);
     info!("loading from {:?}...", options.input.file);
-    let goal = input::load(&options.input, &core).unwrap_or_else(|err| {
+    let goal = input::load(&options.input, &names).unwrap_or_else(|err| {
         match err {
             LoadError::OSError => output::os_error(&options.output),
             LoadError::InputError => output::input_error(&options.output),
@@ -60,16 +58,17 @@ fn main() {
 
     match search.run() {
         SearchResult::TimeOut => {
-            info!("timed out");
+            info!("...timed out");
             debug!("time out, reporting...");
             output::time_out(&options.output);
             debug!("...proof failed, exit(1)");
             exit(1);
         }
-        SearchResult::ProofFound(proof) => {
-            info!("proof found");
+        SearchResult::ProofFound(original, proof) => {
+            info!("...proof found");
             debug!("proof found, reporting...");
-            output::proof_found(&options.output, &core, &proof);
+            let done = original.consume();
+            output::proof_found(&options.output, &names, done, &proof);
             debug!("...proof succeeded, exit(0)");
             exit(0);
         }

@@ -1,17 +1,20 @@
 use clap::{App, Arg, ArgMatches};
 
-pub struct CoreOptions {}
-
-impl CoreOptions {
-    pub fn new(_matches: &ArgMatches) -> Self {
-        CoreOptions {}
-    }
-}
-
 pub enum LoggingOptionsVerbosity {
     Quiet,
     Normal,
     Verbose,
+}
+
+impl LoggingOptionsVerbosity {
+    fn new(flag: &str) -> Self {
+        match flag {
+            "quiet" => LoggingOptionsVerbosity::Quiet,
+            "normal" => LoggingOptionsVerbosity::Normal,
+            "verbose" => LoggingOptionsVerbosity::Verbose,
+            _ => unreachable!()
+        }
+    }
 }
 
 pub struct LoggingOptions {
@@ -20,13 +23,8 @@ pub struct LoggingOptions {
 
 impl LoggingOptions {
     pub fn new(matches: &ArgMatches) -> Self {
-        let verbosity = if matches.is_present("quiet") {
-            LoggingOptionsVerbosity::Quiet
-        } else if matches.is_present("verbose") {
-            LoggingOptionsVerbosity::Verbose
-        } else {
-            LoggingOptionsVerbosity::Normal
-        };
+        let logging_level = matches.value_of("logging").unwrap();
+        let verbosity = LoggingOptionsVerbosity::new(logging_level);
         LoggingOptions { verbosity }
     }
 }
@@ -62,7 +60,6 @@ impl SearchOptions {
 }
 
 pub struct Options {
-    pub core: CoreOptions,
     pub logging: LoggingOptions,
     pub input: InputOptions,
     pub output: OutputOptions,
@@ -96,24 +93,21 @@ impl Options {
                     .validator(|x| validate_seconds(&x))
                     .default_value("60"),
             ).arg(
-                Arg::with_name("quiet")
-                    .long("quiet")
-                    .short("q")
-                    .help("suppress all non-essential output (overrides -v)"),
-            ).arg(
-                Arg::with_name("verbose")
-                    .long("verbose")
-                    .short("v")
-                    .help("debugging output, extremely verbose"),
+                Arg::with_name("logging")
+                    .long("logging")
+                    .takes_value(true)
+                    .value_name("LEVEL")
+                    .possible_value("quiet")
+                    .possible_value("normal")
+                    .possible_value("verbose")
+                    .default_value("normal")
             ).get_matches();
 
-        let core = CoreOptions::new(&matches);
         let logging = LoggingOptions::new(&matches);
         let input = InputOptions::new(&matches);
         let output = OutputOptions::new(&matches);
         let search = SearchOptions::new(&matches);
         Options {
-            core,
             logging,
             input,
             output,

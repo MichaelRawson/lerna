@@ -1,17 +1,14 @@
-use std::sync::Arc;
-use std::vec::Vec;
-
 use crossbeam::scope;
 use time::{get_time, Duration, Timespec};
 
-use core::{Formula, Goal};
+use core::{Goal, Proof};
 use options::SearchOptions;
 use simplifications::simplify;
 use tree::Tree;
 
 pub enum SearchResult {
     TimeOut,
-    ProofFound(Vec<Arc<Formula>>),
+    ProofFound(Goal, Box<Proof>),
 }
 
 pub struct Search {
@@ -26,7 +23,7 @@ impl Search {
         let timeout = start_time + duration;
         debug!("timeout is {:?}", timeout);
 
-        debug!("simplifying start goal {:#?}...", start.formulae);
+        debug!("simplifying start goal...");
         let simplified = simplify(start.clone());
         debug!("...simplified.");
 
@@ -45,7 +42,7 @@ impl Search {
         }
     }
 
-    pub fn run(&self) -> SearchResult {
+    pub fn run(self) -> SearchResult {
         scope(|scope| {
             let mut workers = vec![];
             for index in 1..8 {
@@ -63,10 +60,7 @@ impl Search {
 
         if self.tree.complete() {
             debug!("proof found");
-            let formulae = self.original.formulae.clone();
-            let mut proof = formulae.clone().into_iter().collect();
-            self.tree.proof(formulae, &mut proof);
-            SearchResult::ProofFound(proof)
+            SearchResult::ProofFound(self.original, self.tree.proof())
         } else {
             debug!("proof failed");
             SearchResult::TimeOut

@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use core::{Formula, Goal};
+use core::Goal;
+use core::Formula::*;
 
 pub fn contradiction(goal: Goal) -> Goal {
-    for f in &goal.formulae {
-        if goal.formulae.contains(&Formula::Not(f.clone())) {
+    for f in goal.formulae() {
+        if goal.contains(&Not(f.clone())) {
             trace!("contradiction found for {:?}", f);
-            let false_ = Arc::new(Formula::F);
-            let formulae = set![false_.clone()];
-            return Goal { formulae };
+            return goal.with(Arc::new(F))
         }
     }
     goal

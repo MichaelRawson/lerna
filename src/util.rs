@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::sync::Arc;
 
 use rand::distributions::{Distribution, Uniform};
 use rand::{thread_rng, Rng};
@@ -92,4 +94,9 @@ pub fn weighted_choice(scores: &[f64]) -> usize {
     cumulative
         .binary_search(&sample)
         .unwrap_or_else(|index| index)
+}
+
+pub fn assert_ownership<T>(ptr: Arc<T>) -> T
+    where T: Debug {
+    Arc::try_unwrap(ptr).expect("assumed owned")
 }
