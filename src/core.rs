@@ -55,7 +55,7 @@ pub struct Goal {
 
 impl Goal {
     pub fn new(formulae: Set<Arc<Formula>>) -> Goal {
-        Goal {formulae}
+        Goal { formulae }
     }
 
     pub fn complete(&self) -> bool {
@@ -88,13 +88,8 @@ impl Core {
         let mut symbols = self.symbols.write();
         let entry = (name, arity);
 
-        {
-            match symbols.forward(&entry) {
-                Some(symbol) => {
-                    return *symbol;
-                }
-                None => {}
-            }
+        if let Some(symbol) = symbols.forward(&entry) {
+            return *symbol;
         }
 
         let symbol = Symbol(symbols.len());
@@ -102,7 +97,7 @@ impl Core {
         symbol
     }
 
-    pub fn name_of_symbol(&self, symbol: &Symbol) -> Arc<String> {
-        self.symbols.read().back(symbol).unwrap().0.clone()
+    pub fn name_of_symbol(&self, symbol: Symbol) -> Arc<String> {
+        self.symbols.read().back(&symbol).unwrap().0.clone()
     }
 }

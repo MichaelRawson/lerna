@@ -69,7 +69,7 @@ pub struct Options {
     pub search: SearchOptions,
 }
 
-fn validate_seconds(secs: String) -> Result<(), String> {
+fn validate_seconds(secs: &str) -> Result<(), String> {
     match secs.parse::<usize>() {
         Ok(_) => Ok(()),
         Err(_) => Err("should be a time (in seconds)".to_string()),
@@ -93,7 +93,7 @@ impl Options {
                     .short("t")
                     .takes_value(true)
                     .value_name("SECS")
-                    .validator(validate_seconds)
+                    .validator(|x| validate_seconds(&x))
                     .default_value("60"),
             ).arg(
                 Arg::with_name("quiet")

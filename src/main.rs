@@ -69,7 +69,7 @@ fn main() {
         SearchResult::ProofFound(proof) => {
             info!("proof found");
             debug!("proof found, reporting...");
-            output::proof_found(&options.output, &core, proof);
+            output::proof_found(&options.output, &core, &proof);
             debug!("...proof succeeded, exit(0)");
             exit(0);
         }

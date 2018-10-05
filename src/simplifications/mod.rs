@@ -3,8 +3,7 @@ mod contradiction;
 use core::Goal;
 
 fn simplify_step(goal: Goal) -> Goal {
-    let goal = contradiction::contradiction(goal);
-    goal
+    contradiction::contradiction(goal)
 }
 
 pub fn simplify(goal: Goal) -> Goal {

@@ -4,13 +4,11 @@ use std::vec::Vec;
 use atomic::Atomic;
 use atomic::Ordering::Relaxed;
 use parking_lot::RwLock;
-use rand::distributions::{Distribution, Uniform};
-use rand::{thread_rng, Rng};
 
 use core::{Formula, Goal, Set};
 use inferences::infer;
 use uct::uct;
-use util::Score;
+use util::{equal_choice, weighted_choice};
 
 enum GoalNodeContent {
     Leaf,
@@ -19,101 +17,84 @@ enum GoalNodeContent {
 
 struct GoalNode {
     goal: Goal,
-    locked: RwLock<GoalNodeContent>,
-    visits: Atomic<usize>,
-    distance: Atomic<u16>,
-    complete: Atomic<bool>,
+    lock: RwLock<GoalNodeContent>,
+    atomic_visits: Atomic<usize>,
+    atomic_distance: Atomic<u16>,
+    atomic_complete: Atomic<bool>,
 }
 
 impl GoalNode {
-    pub fn leaf(goal: Goal) -> Arc<Self> {
+    fn leaf(goal: Goal) -> Arc<Self> {
         let complete = goal.complete();
         let distance = if complete { 0 } else { 1 };
-        trace!("new leaf: {:?}", goal.formulae);
 
         Arc::new(GoalNode {
             goal,
-            locked: RwLock::new(GoalNodeContent::Leaf),
-            visits: Atomic::new(1),
-            distance: Atomic::new(distance),
-            complete: Atomic::new(complete),
+            lock: RwLock::new(GoalNodeContent::Leaf),
+            atomic_visits: Atomic::new(1),
+            atomic_distance: Atomic::new(distance),
+            atomic_complete: Atomic::new(complete),
         })
     }
 
-    fn check_complete(&self) -> bool {
-        self.complete.load(Relaxed)
+    fn visits(&self) -> usize {
+        self.atomic_visits.load(Relaxed)
     }
 
-    fn select(&self, top_distance: u16) -> Option<Arc<Self>> {
-        if self.check_complete() {
+    fn distance(&self) -> u16 {
+        self.atomic_distance.load(Relaxed)
+    }
+
+    fn complete(&self) -> bool {
+        self.atomic_complete.load(Relaxed)
+    }
+
+    fn select(&self) -> Option<Arc<Self>> {
+        if self.complete() {
             warn!("selecting complete node");
             return None;
         }
 
-        let lock = self.locked.read();
-        let inferences = match *lock {
+        let locked = self.lock.read();
+        let inferences = match *locked {
             GoalNodeContent::Branch(ref inferences) => inferences,
             GoalNodeContent::Leaf => return None,
         };
 
-        let parent_visits = self.visits.load(Relaxed);
+        let visits = self.visits();
+        let distance = self.distance();
         let uct_scores: Vec<f64> = inferences
             .iter()
-            .map(|inference| {
-                let child_visits = inference.visits.load(Relaxed);
-                let distance = inference.distance.load(Relaxed);
-                let difference = i32::from(top_distance) - i32::from(distance);
-                let score = f64::from(difference) / f64::from(top_distance);
-                uct(score, parent_visits + 1, child_visits)
-            }).collect();
-        let uct_total: f64 = uct_scores.iter().sum();
-        let normalised = uct_scores.iter().map(|x| x / uct_total);
-        let cumulative: Vec<Score> = normalised
-            .scan(0.0, |running, x| {
-                *running += x;
-                Some(*running)
-            }).map(Score::new)
+            .map(|inference| inference.uct_score(visits, distance))
             .collect();
 
-        let mut rng = thread_rng();
-        let range = Uniform::new(0.0, 1.0);
-        let sample = Score::new(range.sample(&mut rng));
-        let selected_index = cumulative
-            .binary_search(&sample)
-            .unwrap_or_else(|index| index);
+        let selected_index = weighted_choice(&uct_scores);
         let selected_inference = &inferences[selected_index];
-
-        let available_goals: Vec<&Arc<GoalNode>> = selected_inference
-            .subgoals
-            .iter()
-            .filter(|goal| !goal.check_complete())
-            .collect();
-
-        rng.choose(&available_goals).map(|x| (*x).clone())
+        selected_inference.select()
     }
 
     fn expand(&self) -> bool {
-        if self.check_complete() {
-            warn!("expanding complete node");
+        if self.complete() {
+            warn!("contention: expanding complete node");
             return false;
         }
-        let mut locked = self.locked.write();
+        let mut locked = self.lock.write();
         let children = match *locked {
             GoalNodeContent::Leaf => infer(self.goal.clone())
                 .into_iter()
                 .map(InferenceNode::new)
                 .collect(),
             GoalNodeContent::Branch(_) => {
-                warn!("already expanded");
+                debug!("contention: expanding already-expanded node");
                 return false;
-            },
+            }
         };
         *locked = GoalNodeContent::Branch(children);
         true
     }
 
     fn update(&self) {
-        let locked = self.locked.read();
+        let locked = self.lock.read();
         let children: &Vec<Box<InferenceNode>> = match *locked {
             GoalNodeContent::Branch(ref x) => &x,
             GoalNodeContent::Leaf => return,
@@ -122,21 +103,22 @@ impl GoalNode {
             child.update();
         }
 
-        let complete = children.iter().any(|goal| goal.check_complete());
+        let complete = children.iter().any(|goal| goal.complete());
         let distance = children
             .iter()
-            .map(|goal| goal.distance.load(Relaxed))
+            .map(|goal| goal.distance())
             .max()
-            .expect("exhausted inferences");
+            .expect("exhausted inferences")
+            + 1;
 
-        self.visits.fetch_add(1, Relaxed);
-        self.complete.store(complete, Relaxed);
-        self.distance.store(distance, Relaxed);
+        self.atomic_visits.fetch_add(1, Relaxed);
+        self.atomic_complete.store(complete, Relaxed);
+        self.atomic_distance.store(distance, Relaxed);
     }
 
     fn proof(&self, mut done: Set<Arc<Formula>>, proof: &mut Vec<Arc<Formula>>) {
-        let lock = self.locked.read();
-        match *lock {
+        let locked = self.lock.read();
+        match *locked {
             GoalNodeContent::Leaf => {
                 proof.push(Arc::new(Formula::F));
             }
@@ -148,7 +130,7 @@ impl GoalNode {
                     }
                 }
 
-                let inference = inferences.iter().find(|x| x.check_complete()).unwrap();
+                let inference = inferences.iter().find(|x| x.complete()).unwrap();
 
                 inference.proof(&done, proof);
             }
@@ -158,39 +140,64 @@ impl GoalNode {
 
 struct InferenceNode {
     subgoals: Vec<Arc<GoalNode>>,
-    visits: Atomic<usize>,
-    distance: Atomic<u16>,
-    complete: Atomic<bool>,
+    atomic_visits: Atomic<usize>,
+    atomic_distance: Atomic<u16>,
+    atomic_complete: Atomic<bool>,
 }
 
 impl InferenceNode {
     fn new(subgoals: Set<Goal>) -> Box<Self> {
         let node = InferenceNode {
             subgoals: subgoals.into_iter().map(GoalNode::leaf).collect(),
-            visits: Atomic::new(1),
-            distance: Atomic::new(1),
-            complete: Atomic::new(false),
+            atomic_visits: Atomic::new(1),
+            atomic_distance: Atomic::new(1),
+            atomic_complete: Atomic::new(false),
         };
         node.update();
         Box::new(node)
     }
 
-    fn check_complete(&self) -> bool {
-        self.complete.load(Relaxed)
+    fn visits(&self) -> usize {
+        self.atomic_visits.load(Relaxed)
+    }
+
+    fn distance(&self) -> u16 {
+        self.atomic_distance.load(Relaxed)
+    }
+
+    fn complete(&self) -> bool {
+        self.atomic_complete.load(Relaxed)
+    }
+
+    fn uct_score(&self, parent_visits: usize, parent_distance: u16) -> f64 {
+        let child_visits = self.visits();
+        let child_distance = self.distance();
+        let difference = i32::from(parent_distance) - i32::from(child_distance);
+        let score = f64::from(difference) / f64::from(parent_distance);
+        uct(score, parent_visits + 1, child_visits)
+    }
+
+    fn select(&self) -> Option<Arc<GoalNode>> {
+        let available: Vec<&Arc<GoalNode>> = self
+            .subgoals
+            .iter()
+            .filter(|goal| !goal.complete())
+            .collect();
+        equal_choice(&available).map(|x| (*x).clone())
     }
 
     fn update(&self) {
-        let complete = self.subgoals.iter().all(|goal| goal.check_complete());
+        let complete = self.subgoals.iter().all(|goal| goal.complete());
         let distance = self
             .subgoals
             .iter()
-            .filter(|goal| !goal.check_complete())
-            .map(|goal| goal.distance.load(Relaxed))
+            .filter(|goal| !goal.complete())
+            .map(|goal| goal.distance())
             .sum();
 
-        self.visits.fetch_add(1, Relaxed);
-        self.complete.store(complete, Relaxed);
-        self.distance.store(distance, Relaxed);
+        self.atomic_visits.fetch_add(1, Relaxed);
+        self.atomic_complete.store(complete, Relaxed);
+        self.atomic_distance.store(distance, Relaxed);
     }
 
     fn proof(&self, done: &Set<Arc<Formula>>, proof: &mut Vec<Arc<Formula>>) {
@@ -212,16 +219,15 @@ impl Tree {
     }
 
     pub fn complete(&self) -> bool {
-        self.root.check_complete()
+        self.root.complete()
     }
 
     pub fn step(&self) {
         let mut stack: Vec<Arc<GoalNode>> = vec![];
         let mut current = self.root.clone();
-        let top_distance = self.root.distance.load(Relaxed);
 
         // select
-        while let Some(next) = current.clone().select(top_distance) {
+        while let Some(next) = current.clone().select() {
             stack.push(current);
             current = next;
         }
@@ -229,7 +235,7 @@ impl Tree {
 
         // expand
         if !current.expand() {
-           return;
+            return;
         }
 
         // update
@@ -244,6 +250,6 @@ impl Tree {
     }
 
     pub fn total_visits(&self) -> usize {
-        self.root.visits.load(Relaxed)
+        self.root.visits()
     }
 }

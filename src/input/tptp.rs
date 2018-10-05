@@ -10,7 +10,7 @@ use input::LoadError;
 
 fn load_fof_term(
     core: &Core,
-    bound: Map<ast::Bound, core::Bound>,
+    bound: &Map<ast::Bound, core::Bound>,
     term: &FofTerm,
 ) -> Result<Arc<Term>, LoadError> {
     Ok(match term {
@@ -31,7 +31,7 @@ fn load_fof_term(
 
             let mut args = vec![];
             for arg in fof_args {
-                args.push(load_fof_term(core, bound.clone(), arg)?);
+                args.push(load_fof_term(core, &bound, arg)?);
             }
             Arc::new(Term::Fun(symbol, args))
         }
@@ -46,8 +46,8 @@ fn load_fof_formula(
     Ok(match formula {
         FofFormula::Boolean(b) => Arc::new(if *b { Formula::T } else { Formula::F }),
         FofFormula::Equal(x, y) => Arc::new(Formula::Eql(
-            load_fof_term(core, bound.clone(), x)?,
-            load_fof_term(core, bound.clone(), y)?,
+            load_fof_term(core, &bound, x)?,
+            load_fof_term(core, &bound, y)?,
         )),
         FofFormula::Predicate(name, fof_args) => {
             let name = Arc::new(format!("{}", name));
@@ -56,7 +56,7 @@ fn load_fof_formula(
 
             let mut args = vec![];
             for arg in fof_args {
-                args.push(load_fof_term(core, bound.clone(), arg)?);
+                args.push(load_fof_term(core, &bound, arg)?);
             }
             Arc::new(Formula::Prd(symbol, args))
         }
@@ -138,7 +138,7 @@ fn load_statement(core: &Core, statement: Statement) -> Result<Arc<Formula>, Loa
 }
 
 fn convert_error(e: Error) -> LoadError {
-    error!("error loading TPTP from {:?}", e.includes);
+    error!("error loading TPTP from {:?}", e.includes.last().unwrap());
     match e.reported {
         Reported::IO(e) => {
             error!("IO error: {:?}", e);

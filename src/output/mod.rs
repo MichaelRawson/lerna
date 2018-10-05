@@ -1,7 +1,6 @@
 mod tptp;
 
 use std::sync::Arc;
-use std::vec::Vec;
 
 use core::{Core, Formula};
 use options::OutputOptions;
@@ -18,7 +17,7 @@ pub fn unsupported(_options: &OutputOptions) {
     tptp::szs_inappropriate();
 }
 
-pub fn proof_found(_options: &OutputOptions, core: &Core, proof: Vec<Arc<Formula>>) {
+pub fn proof_found(_options: &OutputOptions, core: &Core, proof: &[Arc<Formula>]) {
     tptp::szs_refutation(core, proof);
 }
 

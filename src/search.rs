@@ -48,15 +48,17 @@ impl Search {
     pub fn run(&self) -> SearchResult {
         scope(|scope| {
             let mut workers = vec![];
-            for _ in 1..8 {
+            for index in 1..8 {
+                debug!("spawning worker {}", index);
                 workers.push(scope.spawn(|| self.work()));
             }
             for worker in workers {
+                debug!("waiting for worker {:?}", worker);
                 worker.join().unwrap();
             }
         });
 
-        debug!("finished proof search");
+        debug!("search finished");
         debug!("total steps: {}", self.tree.total_visits());
 
         if self.tree.complete() {
