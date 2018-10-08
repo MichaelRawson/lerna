@@ -19,7 +19,6 @@ mod core;
 mod common;
 mod inferences;
 mod input;
-mod logging;
 mod names;
 mod options;
 mod output;
@@ -39,8 +38,9 @@ use search::{Search, SearchResult};
 
 fn main() {
     let start_time = get_time();
+
     let options = Options::parse();
-    logging::setup(&options.logging);
+    output::setup_logging(&options.output);
 
     debug!("program started, start time was {:?}", start_time);
     info!("OK, running for {}s", &options.search.timeout);

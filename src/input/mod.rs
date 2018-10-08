@@ -1,7 +1,7 @@
 pub mod tptp;
 
 use core::Goal;
-use options::InputOptions;
+use options::{InputOptions, InputOptionsLanguage};
 
 pub enum LoadError {
     OSError,
@@ -10,5 +10,7 @@ pub enum LoadError {
 }
 
 pub fn load(options: &InputOptions) -> Result<Goal, LoadError> {
-    tptp::load(&options.file)
+    match options.language {
+        InputOptionsLanguage::TPTP => tptp::load(&options.file),
+    }
 }

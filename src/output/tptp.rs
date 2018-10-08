@@ -1,5 +1,8 @@
+use std::fmt::Arguments;
 use std::sync::Arc;
 
+use fern::FormatCallback;
+use log::Record;
 use tptp::ast;
 use tptp::ast::FofFormula::*;
 use tptp::ast::FofTerm::*;
@@ -125,4 +128,13 @@ pub fn szs_input_error(name: &str) {
 
 pub fn szs_inappropriate(name: &str) {
     println!("% SZS status Inappropriate for {}", name);
+}
+
+pub fn format_log(out: FormatCallback, message: &Arguments, record: &Record) {
+    out.finish(format_args!(
+        "% [{}][{}] {}",
+        record.level(),
+        record.target(),
+        message
+    ))
 }

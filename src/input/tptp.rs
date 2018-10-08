@@ -146,11 +146,11 @@ fn convert_error(e: Error) -> LoadError {
             LoadError::Unsupported
         }
         Reported::Syntactic(e) => {
-            error!("syntax error: {:#?}", e);
+            error!("syntax error: {:?}", e);
             LoadError::InputError
         }
         Reported::Include(e) => {
-            error!("include error: {:#?}", e);
+            error!("include error: {:?}", e);
             LoadError::InputError
         }
     }

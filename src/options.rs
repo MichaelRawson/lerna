@@ -2,47 +2,47 @@ use std::path::Path;
 
 use clap::{App, Arg, ArgMatches};
 
-pub enum LoggingOptionsVerbosity {
-    Quiet,
-    Normal,
-    Verbose,
-}
-
-impl LoggingOptionsVerbosity {
-    fn new(flag: &str) -> Self {
-        match flag {
-            "quiet" => LoggingOptionsVerbosity::Quiet,
-            "normal" => LoggingOptionsVerbosity::Normal,
-            "verbose" => LoggingOptionsVerbosity::Verbose,
-            _ => unreachable!(),
-        }
-    }
-}
-
-pub struct LoggingOptions {
-    pub verbosity: LoggingOptionsVerbosity,
-}
-
-impl LoggingOptions {
-    fn new(matches: &ArgMatches) -> Self {
-        let logging_level = matches.value_of("logging").unwrap();
-        let verbosity = LoggingOptionsVerbosity::new(logging_level);
-        LoggingOptions { verbosity }
-    }
+pub enum InputOptionsLanguage {
+    TPTP,
 }
 
 pub struct InputOptions {
+    pub language: InputOptionsLanguage,
     pub file: String,
 }
 
 impl InputOptions {
     fn new(matches: &ArgMatches) -> Self {
+        let language = InputOptionsLanguage::TPTP;
         let file = matches.value_of("FILE").unwrap().into();
-        InputOptions { file }
+        InputOptions { language, file }
     }
 }
 
+pub enum OutputOptionsLoggingLevel {
+    Quiet,
+    Normal,
+    Verbose,
+}
+
+impl OutputOptionsLoggingLevel {
+    fn new(flag: &str) -> Self {
+        match flag {
+            "quiet" => OutputOptionsLoggingLevel::Quiet,
+            "normal" => OutputOptionsLoggingLevel::Normal,
+            "verbose" => OutputOptionsLoggingLevel::Verbose,
+            _ => unreachable!(),
+        }
+    }
+}
+
+pub enum OutputOptionsLanguage {
+    TPTP,
+}
+
 pub struct OutputOptions {
+    pub language: OutputOptionsLanguage,
+    pub logging_level: OutputOptionsLoggingLevel,
     pub name: String,
 }
 
@@ -53,10 +53,16 @@ impl OutputOptions {
     }
 
     fn new(matches: &ArgMatches) -> Self {
+        let language = OutputOptionsLanguage::TPTP;
+        let logging_level = OutputOptionsLoggingLevel::new(matches.value_of("logging").unwrap());
         let name = Self::get_name(matches.value_of("FILE").unwrap())
             .unwrap_or("<unknown>")
             .into();
-        OutputOptions { name }
+        OutputOptions {
+            language,
+            logging_level,
+            name,
+        }
     }
 }
 
@@ -72,7 +78,6 @@ impl SearchOptions {
 }
 
 pub struct Options {
-    pub logging: LoggingOptions,
     pub input: InputOptions,
     pub output: OutputOptions,
     pub search: SearchOptions,
@@ -115,12 +120,10 @@ impl Options {
                     .default_value("normal"),
             ).get_matches();
 
-        let logging = LoggingOptions::new(&matches);
         let input = InputOptions::new(&matches);
         let output = OutputOptions::new(&matches);
         let search = SearchOptions::new(&matches);
         Options {
-            logging,
             input,
             output,
             search,
