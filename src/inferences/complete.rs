@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use common::{instantiate, replace_in_goal};
+use common::{instantiate_all, instantiate_ex, replace_in_goal};
 use core::Formula::*;
 use core::*;
 use inferences::Inferred;
@@ -44,12 +44,13 @@ fn formula_inferences(goal: &Goal, f: &Arc<Formula>) -> Set<Inferred> {
                 set![set![goal.with(Arc::new(And(nps)))]]
             }
             All(x, ref p) => {
-                let switched = Arc::new(Ex(x, Formula::negate(p.clone())));
-                set![set![goal.with(switched)]]
+                set![set![goal.with(Formula::negate(instantiate_ex(x, p)))]]
             }
             Ex(x, ref p) => {
-                let switched = Arc::new(All(x, Formula::negate(p.clone())));
-                set![set![goal.with(switched)]]
+                instantiate_all(x, goal, p)
+                    .into_iter()
+                    .map(|p| set![goal.with(Formula::negate(p))])
+                    .collect()
             }
         },
         Imp(ref p, ref q) => {
@@ -71,11 +72,8 @@ fn formula_inferences(goal: &Goal, f: &Arc<Formula>) -> Set<Inferred> {
                     .collect()
             }
         }
-        Ex(x, ref p) => instantiate(x, goal, p)
-            .into_iter()
-            .map(|p| set![goal.with(p)])
-            .collect(),
-        All(x, ref p) => instantiate(x, goal, p)
+        Ex(x, ref p) => set![set![goal.with(instantiate_ex(x, p))]],
+        All(x, ref p) => instantiate_all(x, goal, p)
             .into_iter()
             .map(|p| set![goal.with(p)])
             .collect(),

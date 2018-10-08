@@ -113,13 +113,13 @@ fn rebind_term(t: &Arc<Term>) -> (Set<Bound>, Arc<Term>) {
     (fresh, t)
 }
 
-fn instantiate_ex(x: Bound, f: &Arc<Formula>) -> Arc<Formula> {
+pub fn instantiate_ex(x: Bound, f: &Arc<Formula>) -> Arc<Formula> {
     let v = Arc::new(Var(x));
     let k = Arc::new(Fun(fresh_symbol(), vec![]));
     replace_in_formula(f, &v, &k)
 }
 
-pub fn instantiate(x: Bound, goal: &Goal, f: &Arc<Formula>) -> Set<Arc<Formula>> {
+pub fn instantiate_all(x: Bound, goal: &Goal, f: &Arc<Formula>) -> Set<Arc<Formula>> {
     let v = Arc::new(Var(x));
     goal_subterms(goal)
         .into_iter()
