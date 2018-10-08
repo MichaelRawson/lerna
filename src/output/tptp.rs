@@ -104,7 +104,7 @@ fn print_refutation(done: Set<Arc<Formula>>, mut index: usize, proof: &Proof) ->
 }
 
 pub fn szs_refutation(name: &str, done: Set<Arc<Formula>>, proof: &Proof) {
-    println!("% SZS status Refutation for {}", name);
+    println!("% SZS status Theorem for {}", name);
     println!("% SZS output start Refutation for {}", name);
     print_refutation(done, 0, proof);
     println!("% SZS output end Refutation for {}", name);
