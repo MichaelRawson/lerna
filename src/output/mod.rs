@@ -5,22 +5,22 @@ use std::sync::Arc;
 use core::{Formula, Proof, Set};
 use options::OutputOptions;
 
-pub fn os_error(_options: &OutputOptions) {
-    tptp::szs_os_error();
+pub fn os_error(options: &OutputOptions) {
+    tptp::szs_os_error(&options.name);
 }
 
-pub fn input_error(_options: &OutputOptions) {
-    tptp::szs_input_error();
+pub fn input_error(options: &OutputOptions) {
+    tptp::szs_input_error(&options.name);
 }
 
-pub fn unsupported(_options: &OutputOptions) {
-    tptp::szs_inappropriate();
+pub fn unsupported(options: &OutputOptions) {
+    tptp::szs_inappropriate(&options.name);
 }
 
-pub fn proof_found(_options: &OutputOptions, original: Set<Arc<Formula>>, proof: &Proof) {
-    tptp::szs_refutation(original, proof);
+pub fn proof_found(options: &OutputOptions, original: Set<Arc<Formula>>, proof: &Proof) {
+    tptp::szs_refutation(&options.name, original, proof);
 }
 
-pub fn time_out(_options: &OutputOptions) {
-    tptp::szs_timeout();
+pub fn time_out(options: &OutputOptions) {
+    tptp::szs_timeout(&options.name);
 }

@@ -103,26 +103,26 @@ fn print_refutation(done: Set<Arc<Formula>>, mut index: usize, proof: &Proof) ->
     }
 }
 
-pub fn szs_refutation(done: Set<Arc<Formula>>, proof: &Proof) {
-    println!("% SZS status Refutation");
-    println!("% SZS output start");
+pub fn szs_refutation(name: &str, done: Set<Arc<Formula>>, proof: &Proof) {
+    println!("% SZS status Refutation for {}", name);
+    println!("% SZS output start Refutation for {}", name);
     print_refutation(done, 0, proof);
-    println!("% SZS output end");
+    println!("% SZS output end Refutation for {}", name);
     debug!("...statements printed");
 }
 
-pub fn szs_timeout() {
-    println!("% SZS status TimeOut");
+pub fn szs_timeout(name: &str) {
+    println!("% SZS status TimeOut for {}", name);
 }
 
-pub fn szs_os_error() {
-    println!("% SZS status OSError");
+pub fn szs_os_error(name: &str) {
+    println!("% SZS status OSError for {}", name);
 }
 
-pub fn szs_input_error() {
-    println!("% SZS status InputError");
+pub fn szs_input_error(name: &str) {
+    println!("% SZS status InputError for {}", name);
 }
 
-pub fn szs_inappropriate() {
-    println!("% SZS status Inappropriate");
+pub fn szs_inappropriate(name: &str) {
+    println!("% SZS status Inappropriate for {}", name);
 }

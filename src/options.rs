@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use clap::{App, Arg, ArgMatches};
 
 pub enum LoggingOptionsVerbosity {
@@ -22,7 +24,7 @@ pub struct LoggingOptions {
 }
 
 impl LoggingOptions {
-    pub fn new(matches: &ArgMatches) -> Self {
+    fn new(matches: &ArgMatches) -> Self {
         let logging_level = matches.value_of("logging").unwrap();
         let verbosity = LoggingOptionsVerbosity::new(logging_level);
         LoggingOptions { verbosity }
@@ -34,17 +36,27 @@ pub struct InputOptions {
 }
 
 impl InputOptions {
-    pub fn new(matches: &ArgMatches) -> Self {
+    fn new(matches: &ArgMatches) -> Self {
         let file = matches.value_of("FILE").unwrap().into();
         InputOptions { file }
     }
 }
 
-pub struct OutputOptions {}
+pub struct OutputOptions {
+    pub name: String,
+}
 
 impl OutputOptions {
-    pub fn new(_matches: &ArgMatches) -> Self {
-        OutputOptions {}
+    fn get_name(file: &str) -> Option<&str> {
+        let path = Path::new(file);
+        path.file_stem()?.to_str()
+    }
+
+    fn new(matches: &ArgMatches) -> Self {
+        let name = Self::get_name(matches.value_of("FILE").unwrap())
+            .unwrap_or("<unknown>")
+            .into();
+        OutputOptions { name }
     }
 }
 
@@ -53,7 +65,7 @@ pub struct SearchOptions {
 }
 
 impl SearchOptions {
-    pub fn new(matches: &ArgMatches) -> Self {
+    fn new(matches: &ArgMatches) -> Self {
         let timeout = matches.value_of("timeout").unwrap().parse().unwrap();
         SearchOptions { timeout }
     }
