@@ -20,6 +20,7 @@ mod formula;
 mod goal;
 mod inferences;
 mod input;
+mod justification;
 mod options;
 mod output;
 mod proof;
@@ -59,25 +60,30 @@ fn main() {
     });
     info!("loading complete");
 
-    let search = Search::new(&options.search, start_time, goal);
-    info!("begin proving...");
+    let proof = {
+        let search = Search::new(&options.search, start_time, goal);
+        info!("begin proving...");
+        match search.run() {
+            SearchResult::TimeOut => {
+                info!("...timed out");
+                debug!("time out, reporting...");
+                output::time_out(&options.output);
+                debug!("...proof failed, exit(1)");
+                exit(1)
+            }
+            SearchResult::ProofFound(proof) => {
+                info!("...proof found");
+                proof
+            }
+        }
+    };
 
-    match search.run() {
-        SearchResult::TimeOut => {
-            info!("...timed out");
-            debug!("time out, reporting...");
-            output::time_out(&options.output);
-            debug!("...proof failed, exit(1)");
-            exit(1);
-        }
-        SearchResult::RawProofFound(original, proof) => {
-            info!("...proof found");
-            debug!("proof found, reporting...");
-            let done = original.consume();
-            output::proof_found(&options.output, done, &proof);
-            info!("bye!");
-            debug!("...proof succeeded, exit(0)");
-            exit(0);
-        }
-    }
+    info!("reconstructing proof...");
+    // TODO reconstruct proof
+    info!("...proof reconstructed");
+
+    output::proof_found(&options.output, set![], &proof);
+    info!("bye!");
+    debug!("all good, exit(0)");
+    exit(0)
 }

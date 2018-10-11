@@ -7,6 +7,9 @@ macro_rules! set {
     ($($x:tt)*) => {ordset![$($x)*]}
 }
 pub type Map<K, V> = im::OrdMap<K, V>;
+macro_rules! map {
+    ($($x:tt)*) => {ordmap![$($x)*]}
+}
 
 pub struct BiMap<A, B>
 where

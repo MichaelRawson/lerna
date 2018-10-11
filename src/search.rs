@@ -5,19 +5,17 @@ use time::{get_time, Duration, Timespec};
 use goal::Goal;
 use options::SearchOptions;
 use proof::RawProof;
-use simplifications::simplify;
 use tree::Tree;
 
 const STACK_SIZE: usize = 10 * 1024 * 1024;
 
 pub enum SearchResult {
     TimeOut,
-    RawProofFound(Goal, Box<RawProof>),
+    ProofFound(Box<RawProof>),
 }
 
 pub struct Search {
     timeout: Timespec,
-    original: Goal,
     tree: Tree,
 }
 
@@ -27,14 +25,9 @@ impl Search {
         let timeout = start_time + duration;
         debug!("timeout is {:?}", timeout);
 
-        debug!("simplifying start goal...");
-        let simplified = simplify(start.clone());
-        debug!("...simplified.");
-
         let result = Search {
             timeout,
-            original: start,
-            tree: Tree::new(simplified),
+            tree: Tree::new(start),
         };
         debug!("search space initialized");
         result
@@ -71,7 +64,7 @@ impl Search {
 
         if self.tree.complete() {
             debug!("proof found");
-            SearchResult::RawProofFound(self.original, self.tree.proof())
+            SearchResult::ProofFound(self.tree.proof())
         } else {
             debug!("proof failed");
             SearchResult::TimeOut

@@ -108,7 +108,7 @@ fn load_fof_formula(
 }
 
 fn load_fof(role: FormulaRole, formula: &FofFormula) -> Result<Arc<Formula>, LoadError> {
-    let bound = Map::new();
+    let bound = map![];
     let formula = load_fof_formula(bound, 0, formula)?;
     match role {
         FormulaRole::Axiom

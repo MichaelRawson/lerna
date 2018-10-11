@@ -10,6 +10,7 @@ use goal::Goal;
 use inferences::infer;
 use proof::RawProof;
 use random::{equal_choice, weighted_choice};
+use simplifications::simplify;
 
 pub fn uct(score: f64, parent_visits: usize, child_visits: usize) -> f64 {
     #[allow(non_snake_case)]
@@ -211,13 +212,19 @@ impl InferenceNode {
 }
 
 pub struct Tree {
+    start: Goal,
     root: Arc<GoalNode>,
 }
 
 impl Tree {
-    pub fn new(goal: Goal) -> Self {
+    pub fn new(start: Goal) -> Self {
+        debug!("simplifying start goal...");
+        let simplified = simplify(&start);
+        debug!("...simplified.");
+
         Tree {
-            root: GoalNode::leaf(goal),
+            start,
+            root: GoalNode::leaf(simplified),
         }
     }
 
@@ -231,7 +238,8 @@ impl Tree {
 
     pub fn proof(&self) -> Box<RawProof> {
         assert!(self.complete());
-        self.root.proof()
+        let proof = self.root.proof();
+        Box::new(RawProof::branch(self.start.clone(), vec![proof]))
     }
 
     pub fn total_visits(&self) -> usize {

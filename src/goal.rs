@@ -50,10 +50,6 @@ impl Goal {
         self.symbols.iter()
     }
 
-    pub fn consume(self) -> Set<Arc<Formula>> {
-        self.refute
-    }
-
     pub fn replace(&self, to: &Arc<Term>, from: &Arc<Term>) -> Goal {
         Goal::new(self.formulae().map(|f| f.replace(to, from)).collect())
     }

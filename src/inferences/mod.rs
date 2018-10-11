@@ -22,7 +22,7 @@ fn inferences(goal: Goal) -> Set<Inferred> {
 pub fn infer(goal: Goal) -> Set<Inferred> {
     let result: Set<Inferred> = inferences(goal)
         .into_iter()
-        .map(|inferred| inferred.into_iter().map(simplify).collect::<Inferred>())
+        .map(|inferred| inferred.iter().map(simplify).collect::<Inferred>())
         .collect();
     result
 }
