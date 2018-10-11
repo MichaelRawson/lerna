@@ -7,16 +7,17 @@ use tptp::prelude::*;
 use core;
 use core::*;
 use input::LoadError;
-use names::{fresh_binder, symbol_for};
+use names::{symbol_for};
 
 fn load_fof_term(
-    bound: &Map<ast::Bound, core::Bound>,
+    bound: &Map<ast::Bound, usize>,
+    bound_depth: usize,
     term: &FofTerm,
 ) -> Result<Arc<Term>, LoadError> {
     Ok(match term {
         FofTerm::Variable(x) => {
             let x = match bound.get(x) {
-                Some(x) => *x,
+                Some(x) => core::Bound(bound_depth - 1 - x),
                 None => {
                     error!("unbound variable: {}", x);
                     return Err(LoadError::InputError);
@@ -26,11 +27,12 @@ fn load_fof_term(
         }
         FofTerm::Functor(name, fof_args) => {
             let name = Arc::new(format!("{}", name));
-            let symbol = symbol_for(&name);
+            let arity = fof_args.len();
+            let symbol = symbol_for(&name, arity);
 
             let mut args = vec![];
             for arg in fof_args {
-                args.push(load_fof_term(&bound, arg)?);
+                args.push(load_fof_term(&bound, bound_depth, arg)?);
             }
             Arc::new(Term::Fun(symbol, args))
         }
@@ -38,34 +40,36 @@ fn load_fof_term(
 }
 
 fn load_fof_formula(
-    mut bound: Map<ast::Bound, core::Bound>,
+    mut bound: Map<ast::Bound, usize>,
+    bound_depth: usize,
     formula: &FofFormula,
 ) -> Result<Arc<Formula>, LoadError> {
     Ok(match formula {
         FofFormula::Boolean(b) => Arc::new(if *b { Formula::T } else { Formula::F }),
         FofFormula::Equal(x, y) => Arc::new(Formula::Eql(
-            load_fof_term(&bound, x)?,
-            load_fof_term(&bound, y)?,
+            load_fof_term(&bound, bound_depth, x)?,
+            load_fof_term(&bound, bound_depth, y)?,
         )),
         FofFormula::Predicate(name, fof_args) => {
             let name = Arc::new(format!("{}", name));
-            let symbol = symbol_for(&name);
+            let arity = fof_args.len();
+            let symbol = symbol_for(&name, arity);
 
             let mut args = vec![];
             for arg in fof_args {
-                args.push(load_fof_term(&bound, arg)?);
+                args.push(load_fof_term(&bound, bound_depth, arg)?);
             }
             Arc::new(Formula::Prd(symbol, args))
         }
         FofFormula::Unary(op, f) => {
-            let f = load_fof_formula(bound.clone(), f)?;
+            let f = load_fof_formula(bound.clone(), bound_depth, f)?;
             Arc::new(match op {
                 FofUnaryOp::Not => Formula::Not(f),
             })
         }
         FofFormula::NonAssoc(op, left, right) => {
-            let left = load_fof_formula(bound.clone(), left)?;
-            let right = load_fof_formula(bound.clone(), right)?;
+            let left = load_fof_formula(bound.clone(), bound_depth, left)?;
+            let right = load_fof_formula(bound.clone(), bound_depth, right)?;
             Arc::new(match op {
                 FofNonAssocOp::Implies => Formula::Imp(left, right),
                 FofNonAssocOp::Equivalent => Formula::Eqv(left, right),
@@ -74,7 +78,7 @@ fn load_fof_formula(
         FofFormula::Assoc(op, fof_args) => {
             let mut args = set![];
             for arg in fof_args {
-                args.insert(load_fof_formula(bound.clone(), arg)?);
+                args.insert(load_fof_formula(bound.clone(), bound_depth, arg)?);
             }
             Arc::new(match op {
                 FofAssocOp::And => Formula::And(args),
@@ -86,23 +90,26 @@ fn load_fof_formula(
                 FofQuantifier::Forall => Formula::All,
                 FofQuantifier::Exists => Formula::Ex,
             };
-            let binders: Vec<core::Bound> = binders
-                .iter()
-                .map(|x| {
-                    let x_bound = fresh_binder();
-                    bound.insert(x.clone(), x_bound);
-                    x_bound
-                }).rev()
-                .collect();
-            let f = load_fof_formula(bound, f)?;
-            binders.iter().fold(f, |f, x| Arc::new(quantifier(*x, f)))
+            let num_bound = binders.len();
+
+            let mut depth = bound_depth;
+            for binder in binders {
+                bound.insert(binder.clone(), depth);
+                depth += 1;
+            }
+
+            let mut f = load_fof_formula(bound, depth, f)?;
+            for _ in 0..num_bound {
+                f = Arc::new(quantifier(f));
+            }
+            f
         }
     })
 }
 
 fn load_fof(role: FormulaRole, formula: &FofFormula) -> Result<Arc<Formula>, LoadError> {
     let bound = Map::new();
-    let formula = load_fof_formula(bound, formula)?;
+    let formula = load_fof_formula(bound, 0, formula)?;
     match role {
         FormulaRole::Axiom | FormulaRole::Hypothesis | FormulaRole::NegatedConjecture => {
             Ok(formula)

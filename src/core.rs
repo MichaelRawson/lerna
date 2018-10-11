@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::vec::Vec;
 
 use im;
+use common::{formula_symbols};
 
 pub type Set<T> = im::OrdSet<T>;
 macro_rules! set {
@@ -32,8 +33,8 @@ pub enum Formula {
     Eqv(Arc<Formula>, Arc<Formula>),
     And(Set<Arc<Formula>>),
     Or(Set<Arc<Formula>>),
-    All(Bound, Arc<Formula>),
-    Ex(Bound, Arc<Formula>),
+    All(Arc<Formula>),
+    Ex(Arc<Formula>),
 }
 
 impl Formula {
@@ -45,19 +46,29 @@ impl Formula {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Goal {
     refute: Set<Arc<Formula>>,
+    symbols: Set<Symbol>
 }
 
 impl Goal {
     pub fn new(refute: Set<Arc<Formula>>) -> Self {
-        Goal { refute }
+        let symbols = Set::unions(refute.iter().map(formula_symbols));
+        Goal { refute, symbols }
     }
 
     pub fn with(&self, f: Arc<Formula>) -> Self {
-        Goal::new(self.refute.update(f))
+        if self.refute.contains(&f) {
+            self.clone()
+        }
+        else {
+            let mut refute = self.refute.clone();
+            let symbols = self.symbols.clone().union(formula_symbols(&f));
+            refute.insert(f);
+            Goal { refute, symbols }
+        }
     }
 
     pub fn with_many(&self, formulae: Set<Arc<Formula>>) -> Self {
-        Goal::new(self.refute.clone().union(formulae))
+        formulae.into_iter().fold(self.clone(), |goal, f| goal.with(f))
     }
 
     pub fn contains(&self, f: &Formula) -> bool {
@@ -72,6 +83,10 @@ impl Goal {
         self.refute.iter()
     }
 
+    pub fn symbols(&self) -> impl Iterator<Item = &Symbol> {
+        self.symbols.iter()
+    }
+
     pub fn consume(self) -> Set<Arc<Formula>> {
         self.refute
     }
@@ -79,7 +94,7 @@ impl Goal {
 
 pub enum Proof {
     Leaf,
-    Branch(Set<Arc<Formula>>, Vec<Box<Proof>>),
+    Branch(Goal, Vec<Box<Proof>>),
 }
 
 impl Proof {
@@ -89,6 +104,6 @@ impl Proof {
     }
 
     pub fn branch(goal: Goal, children: Vec<Box<Proof>>) -> Self {
-        Proof::Branch(goal.consume(), children)
+        Proof::Branch(goal, children)
     }
 }

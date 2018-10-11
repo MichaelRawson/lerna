@@ -8,7 +8,7 @@ use parking_lot::RwLock;
 use core::{Goal, Proof, Set};
 use inferences::infer;
 use uct::uct;
-use util::{assert_ownership, equal_choice, weighted_choice};
+use util::{equal_choice, weighted_choice};
 
 #[derive(Debug)]
 enum GoalNodeContent {
@@ -124,15 +124,14 @@ impl GoalNode {
         self.atomic_distance.store(distance, Relaxed);
     }
 
-    fn proof(self) -> Box<Proof> {
-        let goal = self.goal;
-        let unlocked = self.lock.into_inner();
-        match unlocked {
-            GoalNodeContent::Leaf => Box::new(Proof::leaf(&goal)),
-            GoalNodeContent::Branch(inferences) => Box::new(Proof::branch(
-                goal,
+    fn proof(&self) -> Box<Proof> {
+        let lock = self.lock.read();
+        match *lock {
+            GoalNodeContent::Leaf => Box::new(Proof::leaf(&self.goal)),
+            GoalNodeContent::Branch(ref inferences) => Box::new(Proof::branch(
+                self.goal.clone(),
                 inferences
-                    .into_iter()
+                    .iter()
                     .find(|x| x.complete())
                     .unwrap()
                     .proofs(),
@@ -204,10 +203,9 @@ impl InferenceNode {
         self.atomic_distance.store(distance, Relaxed);
     }
 
-    fn proofs(self) -> Vec<Box<Proof>> {
+    fn proofs(&self) -> Vec<Box<Proof>> {
         self.subgoals
-            .into_iter()
-            .map(assert_ownership)
+            .iter()
             .map(|x| x.proof())
             .collect()
     }
@@ -232,10 +230,9 @@ impl Tree {
         self.root.step();
     }
 
-    pub fn proof(self) -> Box<Proof> {
+    pub fn proof(&self) -> Box<Proof> {
         assert!(self.complete());
-        let root = assert_ownership(self.root);
-        root.proof()
+        self.root.proof()
     }
 
     pub fn total_visits(&self) -> usize {

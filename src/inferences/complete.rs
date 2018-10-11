@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use common::{instantiate_all, instantiate_ex, replace_in_goal};
+use common::{replace_in_goal, instantiate_with_constant, instantiate_with_symbol};
 use core::Formula::*;
 use core::*;
 use inferences::Inferred;
@@ -29,25 +29,31 @@ fn formula_inferences(goal: &Goal, f: &Arc<Formula>) -> Set<Inferred> {
             Imp(ref p, ref q) => {
                 let nq = Formula::negate(q.clone());
                 set![set![goal.with(p.clone()).with(nq)]]
-            }
+            },
             Eqv(ref p, ref q) => {
                 let npimpq = Formula::negate(Arc::new(Imp(p.clone(), q.clone())));
                 let nqimpp = Formula::negate(Arc::new(Imp(q.clone(), p.clone())));
                 set![set![goal.with(npimpq), goal.with(nqimpp)]]
-            }
+            },
             And(ref ps) => {
                 let nps = ps.iter().map(|x| Formula::negate(x.clone())).collect();
                 set![set![goal.with(Arc::new(Or(nps)))]]
-            }
+            },
             Or(ref ps) => {
                 let nps = ps.iter().map(|x| Formula::negate(x.clone())).collect();
                 set![set![goal.with(Arc::new(And(nps)))]]
-            }
-            All(x, ref p) => set![set![goal.with(Formula::negate(instantiate_ex(x, p)))]],
-            Ex(x, ref p) => instantiate_all(x, goal, p)
-                .into_iter()
-                .map(|p| set![goal.with(Formula::negate(p))])
-                .collect(),
+            },
+            Ex(ref p) => goal.symbols()
+                .map(|s| set![goal.with(
+                    Formula::negate(instantiate_with_symbol(p, *s))
+                )])
+                .collect::<Set<_>>()
+                .update(set![goal.with(
+                    Formula::negate(instantiate_with_constant(p))
+                )]),
+            All(ref p) => set![set![goal.with(
+                Formula::negate(instantiate_with_constant(p))
+            )]],
         },
         Imp(ref p, ref q) => {
             let np = Formula::negate(p.clone());
@@ -67,12 +73,12 @@ fn formula_inferences(goal: &Goal, f: &Arc<Formula>) -> Set<Inferred> {
                     .map(|p| set![goal.with(p.clone()), goal.with(Arc::new(Or(ps.without(p))))])
                     .collect()
             }
-        }
-        Ex(x, ref p) => set![set![goal.with(instantiate_ex(x, p))]],
-        All(x, ref p) => instantiate_all(x, goal, p)
-            .into_iter()
-            .map(|p| set![goal.with(p)])
-            .collect(),
+        },
+        Ex(ref p) => set![set![goal.with(instantiate_with_constant(p))]],
+        All(ref p) => goal.symbols()
+            .map(|s| set![goal.with(instantiate_with_symbol(p, *s))])
+            .collect::<Set<_>>()
+            .update(set![goal.with(instantiate_with_constant(p))])
     }
 }
 

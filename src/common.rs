@@ -2,45 +2,33 @@ use std::sync::Arc;
 
 use core::Formula::*;
 use core::Term::*;
-use core::{Bound, Formula, Goal, Set, Term};
+use core::{Bound, Formula, Goal, Term, Set, Symbol};
+use names::{fresh_symbol, symbol_arity};
 
-use names::{fresh_binder, fresh_symbol};
-
-fn term_binders(t: &Arc<Term>) -> Set<Bound> {
-    match **t {
-        Var(x) => set![x],
-        Fun(_, ref args) => Set::unions(args.iter().map(term_binders)),
-    }
-}
-
-fn term_subterms(t: &Arc<Term>) -> Set<Arc<Term>> {
+fn term_symbols(t: &Arc<Term>) -> Set<Symbol> {
     match **t {
         Var(_) => set![],
-        Fun(_, ref args) => {
-            let mut arg_terms = Set::unions(args.iter().map(term_subterms));
-            arg_terms.insert(t.clone());
-            arg_terms
+        Fun(f, ref args) => {
+            let mut arg_symbols = Set::unions(args.iter().map(term_symbols));
+            arg_symbols.insert(f);
+            arg_symbols
         }
     }
 }
 
-fn formula_subterms(f: &Arc<Formula>) -> Set<Arc<Term>> {
+pub fn formula_symbols(f: &Arc<Formula>) -> Set<Symbol> {
     match **f {
         T | F => set![],
-        Eql(ref left, ref right) => term_subterms(left).union(term_subterms(right)),
-        Prd(_, ref args) => Set::unions(args.iter().map(term_subterms)),
-        Not(ref p) => formula_subterms(p),
-        Imp(ref p, ref q) => formula_subterms(p).union(formula_subterms(q)),
-        Eqv(ref p, ref q) => formula_subterms(p).union(formula_subterms(q)),
-        And(ref ps) => Set::unions(ps.iter().map(formula_subterms)),
-        Or(ref ps) => Set::unions(ps.iter().map(formula_subterms)),
-        All(_, ref p) => formula_subterms(p),
-        Ex(_, ref p) => formula_subterms(p),
+        Eql(ref left, ref right) => term_symbols(left).union(term_symbols(right)),
+        Prd(_, ref args) => Set::unions(args.iter().map(term_symbols)),
+        Not(ref p) => formula_symbols(p),
+        Imp(ref p, ref q) => formula_symbols(p).union(formula_symbols(q)),
+        Eqv(ref p, ref q) => formula_symbols(p).union(formula_symbols(q)),
+        And(ref ps) => Set::unions(ps.iter().map(formula_symbols)),
+        Or(ref ps) => Set::unions(ps.iter().map(formula_symbols)),
+        All(ref p) => formula_symbols(p),
+        Ex(ref p) => formula_symbols(p),
     }
-}
-
-pub fn goal_subterms(goal: &Goal) -> Set<Arc<Term>> {
-    Set::unions(goal.formulae().map(formula_subterms))
 }
 
 fn replace_in_term(t: &Arc<Term>, to: &Arc<Term>, from: &Arc<Term>) -> Arc<Term> {
@@ -48,7 +36,7 @@ fn replace_in_term(t: &Arc<Term>, to: &Arc<Term>, from: &Arc<Term>) -> Arc<Term>
         from.clone()
     } else {
         match **t {
-            Var(_) => t.clone(),
+            Var(_) => panic!("replacing non-ground term"),
             Fun(f, ref args) => Arc::new(Fun(
                 f,
                 args.iter().map(|t| replace_in_term(t, to, from)).collect(),
@@ -85,8 +73,8 @@ pub fn replace_in_formula(f: &Arc<Formula>, to: &Arc<Term>, from: &Arc<Term>) ->
             .iter()
             .map(|p| replace_in_formula(p, to, from))
             .collect())),
-        All(x, ref p) => Arc::new(All(x, replace_in_formula(p, to, from))),
-        Ex(x, ref p) => Arc::new(Ex(x, replace_in_formula(p, to, from))),
+        All(ref p) => Arc::new(All(replace_in_formula(p, to, from))),
+        Ex(ref p) => Arc::new(Ex(replace_in_formula(p, to, from))),
     }
 }
 
@@ -98,38 +86,82 @@ pub fn replace_in_goal(goal: &Goal, to: &Arc<Term>, from: &Arc<Term>) -> Goal {
     )
 }
 
-fn rebind_term(t: &Arc<Term>) -> (Set<Bound>, Arc<Term>) {
-    let xs = term_binders(t);
-    let mut t = t.clone();
-    let fresh = xs
-        .into_iter()
-        .map(|x| {
-            let old = Arc::new(Var(x));
-            let fresh = fresh_binder();
-            let new = Arc::new(Var(fresh));
-            t = replace_in_term(&t, &old, &new);
-            fresh
-        }).collect();
-    (fresh, t)
+fn shift_indices(t: &Arc<Term>, shift: usize) -> Arc<Term> {
+    match **t {
+        Var(Bound(b)) => Arc::new(Var(Bound(b + shift))),
+        Fun(f, ref args) => Arc::new(Fun(f,
+            args.iter()
+                .map(|t| shift_indices(t, shift))
+                .collect()
+        ))
+    }
 }
 
-pub fn instantiate_ex(x: Bound, f: &Arc<Formula>) -> Arc<Formula> {
-    let v = Arc::new(Var(x));
-    let k = Arc::new(Fun(fresh_symbol(), vec![]));
-    replace_in_formula(f, &v, &k)
+fn instantiate_in_term(t: &Arc<Term>, i: &Arc<Term>, index: usize) -> Arc<Term> {
+    match **t {
+        Var(Bound(b)) => if b == index {
+            shift_indices(i, index)
+        }
+        else {
+            t.clone()
+        },
+        Fun(f, ref args) => Arc::new(Fun(f,
+            args.iter()
+                .map(|t| instantiate_in_term(t, i, index))
+                .collect()
+        ))
+    }
 }
 
-pub fn instantiate_all(x: Bound, goal: &Goal, f: &Arc<Formula>) -> Set<Arc<Formula>> {
-    let v = Arc::new(Var(x));
-    goal_subterms(goal)
-        .into_iter()
-        .map(|t| {
-            let (xs, t) = rebind_term(&t);
-            let mut acc = replace_in_formula(f, &v, &t);
-            for x in xs {
-                acc = Arc::new(All(x, acc));
-            }
-            acc
-        }).collect::<Set<_>>()
-        .update(instantiate_ex(x, f))
+pub fn instantiate_in_formula(f: &Arc<Formula>, i: &Arc<Term>, index: usize) -> Arc<Formula> {
+    match **f {
+        T | F => f.clone(),
+        Prd(p, ref args) => Arc::new(Prd(p, args.iter()
+            .map(|t| instantiate_in_term(t, i, index))
+            .collect()
+        )),
+        Eql(ref left, ref right) => Arc::new(Eql(
+            instantiate_in_term(left, i, index),
+            instantiate_in_term(right, i, index)
+        )),
+        Not(ref p) => Arc::new(Not(instantiate_in_formula(p, i, index))),
+        Imp(ref left, ref right) => Arc::new(Imp(
+            instantiate_in_formula(left, i, index),
+            instantiate_in_formula(right, i, index)
+        )),
+        Eqv(ref left, ref right) => Arc::new(Eqv(
+            instantiate_in_formula(left, i, index),
+            instantiate_in_formula(right, i, index)
+        )),
+        And(ref ps) => Arc::new(And(
+            ps.iter()
+                .map(|p| instantiate_in_formula(p, i, index))
+                .collect()
+        )),
+        Or(ref ps) => Arc::new(Or(
+            ps.iter()
+                .map(|p| instantiate_in_formula(p, i, index))
+                .collect()
+        )),
+        All(ref p) => Arc::new(All(instantiate_in_formula(p, i, index + 1))),
+        Ex(ref p) => Arc::new(Ex(instantiate_in_formula(p, i, index + 1))),
+    }
+}
+
+pub fn instantiate_with_constant(f: &Arc<Formula>) -> Arc<Formula> {
+    let constant = Arc::new(Fun(fresh_symbol(0), vec![]));
+    instantiate_in_formula(&f, &constant, 0)
+}
+
+pub fn instantiate_with_symbol(f: &Arc<Formula>, symbol: Symbol) -> Arc<Formula> {
+    let arity = symbol_arity(symbol);
+    let vars = (0..arity)
+        .map(|i| Arc::new(Var(Bound(i))))
+        .collect();
+    let term = Arc::new(Fun(symbol, vars));
+    let mut f = instantiate_in_formula(&f, &term, 0);
+    for _ in 0..arity {
+        f = Arc::new(All(f));
+    }
+    f
 }
