@@ -1,6 +1,7 @@
 mod complete;
 
-use core::*;
+use collections::Set;
+use goal::Goal;
 use simplifications::simplify;
 
 pub type Inferred = Set<Goal>;

@@ -1,6 +1,6 @@
 pub mod tptp;
 
-use core::Goal;
+use goal::Goal;
 use options::{InputOptions, InputOptionsLanguage};
 
 pub enum LoadError {

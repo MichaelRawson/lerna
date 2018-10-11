@@ -2,8 +2,9 @@ use crossbeam::scope;
 use num_cpus;
 use time::{get_time, Duration, Timespec};
 
-use core::{Goal, Proof};
+use goal::Goal;
 use options::SearchOptions;
+use proof::RawProof;
 use simplifications::simplify;
 use tree::Tree;
 
@@ -11,7 +12,7 @@ const STACK_SIZE: usize = 10 * 1024 * 1024;
 
 pub enum SearchResult {
     TimeOut,
-    ProofFound(Goal, Box<Proof>),
+    RawProofFound(Goal, Box<RawProof>),
 }
 
 pub struct Search {
@@ -70,7 +71,7 @@ impl Search {
 
         if self.tree.complete() {
             debug!("proof found");
-            SearchResult::ProofFound(self.original, self.tree.proof())
+            SearchResult::RawProofFound(self.original, self.tree.proof())
         } else {
             debug!("proof failed");
             SearchResult::TimeOut

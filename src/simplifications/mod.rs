@@ -1,6 +1,6 @@
 mod contradiction;
 
-use core::Goal;
+use goal::Goal;
 
 fn simplify_step(goal: Goal) -> Goal {
     //contradiction::contradiction(goal)

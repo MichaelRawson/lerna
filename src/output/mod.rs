@@ -6,8 +6,10 @@ use std::sync::Arc;
 use fern::Dispatch;
 use log::LevelFilter::{Info, Trace, Warn};
 
-use core::{Formula, Proof, Set};
+use collections::Set;
+use formula::Formula;
 use options::{OutputOptions, OutputOptionsLanguage, OutputOptionsLoggingLevel};
+use proof::RawProof;
 
 pub fn os_error(options: &OutputOptions) {
     match options.language {
@@ -27,7 +29,7 @@ pub fn unsupported(options: &OutputOptions) {
     }
 }
 
-pub fn proof_found(options: &OutputOptions, original: Set<Arc<Formula>>, proof: &Proof) {
+pub fn proof_found(options: &OutputOptions, original: Set<Arc<Formula>>, proof: &RawProof) {
     match options.language {
         OutputOptionsLanguage::TPTP => tptp::szs_refutation(&options.name, original, proof),
     }

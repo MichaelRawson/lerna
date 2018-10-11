@@ -1,8 +1,8 @@
 /*
 use std::sync::Arc;
 
-use core::Formula::*;
-use core::Goal;
+use formula::Formula::*;
+use goal::Goal;
 
 pub fn contradiction(goal: Goal) -> Goal {
     for f in goal.formulae() {

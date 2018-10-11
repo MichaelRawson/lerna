@@ -15,18 +15,21 @@ extern crate time;
 extern crate tptp;
 
 #[macro_use]
-mod core;
-mod common;
+mod collections;
+mod formula;
+mod goal;
 mod inferences;
 mod input;
-mod names;
 mod options;
 mod output;
+mod proof;
+mod random;
+mod score;
 mod search;
 mod simplifications;
+mod symbol;
+mod term;
 mod tree;
-mod uct;
-mod util;
 
 use std::process::exit;
 
@@ -67,7 +70,7 @@ fn main() {
             debug!("...proof failed, exit(1)");
             exit(1);
         }
-        SearchResult::ProofFound(original, proof) => {
+        SearchResult::RawProofFound(original, proof) => {
             info!("...proof found");
             debug!("proof found, reporting...");
             let done = original.consume();

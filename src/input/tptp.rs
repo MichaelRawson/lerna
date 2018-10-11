@@ -4,39 +4,39 @@ use tptp::ast;
 use tptp::ast::*;
 use tptp::prelude::*;
 
-use core;
-use core::*;
+use collections::{Map, Set};
+use formula::Formula;
+use goal::Goal;
 use input::LoadError;
-use names::{symbol_for};
+use symbol::Symbol;
+use term::Term;
+use term::Term::*;
 
 fn load_fof_term(
     bound: &Map<ast::Bound, usize>,
     bound_depth: usize,
     term: &FofTerm,
 ) -> Result<Arc<Term>, LoadError> {
-    Ok(match term {
-        FofTerm::Variable(x) => {
-            let x = match bound.get(x) {
-                Some(x) => core::Bound(bound_depth - 1 - x),
-                None => {
-                    error!("unbound variable: {}", x);
-                    return Err(LoadError::InputError);
-                }
-            };
-            Arc::new(Term::Var(x))
-        }
+    match term {
+        FofTerm::Variable(x) => match bound.get(x) {
+            Some(x) => Ok(Arc::new(Var(bound_depth - 1 - x))),
+            None => {
+                error!("unbound variable: {}", x);
+                Err(LoadError::InputError)
+            }
+        },
         FofTerm::Functor(name, fof_args) => {
             let name = Arc::new(format!("{}", name));
             let arity = fof_args.len();
-            let symbol = symbol_for(&name, arity);
+            let symbol = Symbol::get(&name, arity);
 
             let mut args = vec![];
             for arg in fof_args {
                 args.push(load_fof_term(&bound, bound_depth, arg)?);
             }
-            Arc::new(Term::Fun(symbol, args))
+            Ok(Arc::new(Fun(symbol, args)))
         }
-    })
+    }
 }
 
 fn load_fof_formula(
@@ -53,7 +53,7 @@ fn load_fof_formula(
         FofFormula::Predicate(name, fof_args) => {
             let name = Arc::new(format!("{}", name));
             let arity = fof_args.len();
-            let symbol = symbol_for(&name, arity);
+            let symbol = Symbol::get(&name, arity);
 
             let mut args = vec![];
             for arg in fof_args {
@@ -111,10 +111,14 @@ fn load_fof(role: FormulaRole, formula: &FofFormula) -> Result<Arc<Formula>, Loa
     let bound = Map::new();
     let formula = load_fof_formula(bound, 0, formula)?;
     match role {
-        FormulaRole::Axiom | FormulaRole::Hypothesis | FormulaRole::Definition | FormulaRole::Lemma | FormulaRole::Theorem | FormulaRole::Corollary | FormulaRole::NegatedConjecture => {
-            Ok(formula)
-        }
-        FormulaRole::Conjecture => Ok(Formula::negate(formula)),
+        FormulaRole::Axiom
+        | FormulaRole::Hypothesis
+        | FormulaRole::Definition
+        | FormulaRole::Lemma
+        | FormulaRole::Theorem
+        | FormulaRole::Corollary
+        | FormulaRole::NegatedConjecture => Ok(formula),
+        FormulaRole::Conjecture => Ok(formula.negated()),
         other => {
             error!("unsupported TPTP formula role: \"{}\"", other);
             Err(LoadError::Unsupported)

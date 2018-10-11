@@ -5,10 +5,18 @@ use atomic::Atomic;
 use atomic::Ordering::Relaxed;
 use parking_lot::RwLock;
 
-use core::{Goal, Proof, Set};
+use collections::Set;
+use goal::Goal;
 use inferences::infer;
-use uct::uct;
-use util::{equal_choice, weighted_choice};
+use proof::RawProof;
+use random::{equal_choice, weighted_choice};
+
+pub fn uct(score: f64, parent_visits: usize, child_visits: usize) -> f64 {
+    #[allow(non_snake_case)]
+    let N = parent_visits as f64;
+    let n = child_visits as f64;
+    score + (2.0 * N.ln() / n).sqrt()
+}
 
 #[derive(Debug)]
 struct GoalNode {
@@ -101,7 +109,7 @@ impl GoalNode {
 
     fn update(&self) {
         if !self.expanded() {
-            return
+            return;
         }
         let children = self.children.read();
         for child in &*children {
@@ -121,19 +129,14 @@ impl GoalNode {
         self.atomic_distance.store(distance, Relaxed);
     }
 
-    fn proof(&self) -> Box<Proof> {
+    fn proof(&self) -> Box<RawProof> {
         if !self.expanded() {
-            Box::new(Proof::leaf(&self.goal))
-        }
-        else {
+            Box::new(RawProof::leaf(&self.goal))
+        } else {
             let inferences = self.children.read();
-            Box::new(Proof::branch(
+            Box::new(RawProof::branch(
                 self.goal.clone(),
-                inferences
-                    .iter()
-                    .find(|x| x.complete())
-                    .unwrap()
-                    .proofs()
+                inferences.iter().find(|x| x.complete()).unwrap().proofs(),
             ))
         }
     }
@@ -202,11 +205,8 @@ impl InferenceNode {
         self.atomic_distance.store(distance, Relaxed);
     }
 
-    fn proofs(&self) -> Vec<Box<Proof>> {
-        self.subgoals
-            .iter()
-            .map(|x| x.proof())
-            .collect()
+    fn proofs(&self) -> Vec<Box<RawProof>> {
+        self.subgoals.iter().map(|x| x.proof()).collect()
     }
 }
 
@@ -229,7 +229,7 @@ impl Tree {
         self.root.step();
     }
 
-    pub fn proof(&self) -> Box<Proof> {
+    pub fn proof(&self) -> Box<RawProof> {
         assert!(self.complete());
         self.root.proof()
     }

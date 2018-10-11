@@ -7,10 +7,12 @@ use tptp::ast;
 use tptp::ast::FofFormula::*;
 use tptp::ast::FofTerm::*;
 
-use core::Formula::*;
-use core::Term::*;
-use core::{Bound, Formula, Proof, Set, Term};
-use names::symbol_name;
+use collections::Set;
+use formula::Formula;
+use formula::Formula::*;
+use proof::RawProof;
+use term::Term;
+use term::Term::*;
 
 fn to_tptp_bound(bound: usize) -> ast::Bound {
     ast::Bound(Arc::new(format!("X{}", bound)))
@@ -18,10 +20,10 @@ fn to_tptp_bound(bound: usize) -> ast::Bound {
 
 fn to_tptp_term(t: &Arc<Term>, bound_depth: usize) -> Box<ast::FofTerm> {
     Box::new(match **t {
-        Var(Bound(bound)) => Variable(to_tptp_bound(bound_depth - 1 - bound)),
+        Var(x) => Variable(to_tptp_bound(bound_depth - 1 - x)),
         Fun(f, ref ts) => {
             let ts = ts.iter().map(|t| to_tptp_term(t, bound_depth)).collect();
-            let name = ast::Name::Word(symbol_name(f));
+            let name = ast::Name::Word(f.name());
             Functor(name, ts)
         }
     })
@@ -31,10 +33,13 @@ fn to_tptp_formula(f: &Arc<Formula>, bound_depth: usize) -> Box<ast::FofFormula>
     Box::new(match **f {
         T => Boolean(true),
         F => Boolean(false),
-        Eql(ref left, ref right) => Equal(to_tptp_term(left, bound_depth), to_tptp_term(right, bound_depth)),
+        Eql(ref left, ref right) => Equal(
+            to_tptp_term(left, bound_depth),
+            to_tptp_term(right, bound_depth),
+        ),
         Prd(p, ref ts) => {
             let ts = ts.iter().map(|x| to_tptp_term(x, bound_depth)).collect();
-            let name = ast::Name::Word(symbol_name(p));
+            let name = ast::Name::Word(p.name());
             Predicate(name, ts)
         }
         Not(ref p) => Unary(ast::FofUnaryOp::Not, to_tptp_formula(p, bound_depth)),
@@ -76,14 +81,14 @@ fn to_tptp_statement(index: usize, f: &Arc<Formula>) -> ast::Statement {
     ast::Statement::Fof(name, role, formula)
 }
 
-fn print_refutation(done: Set<Arc<Formula>>, mut index: usize, proof: &Proof) -> usize {
+fn print_refutation(done: Set<Arc<Formula>>, mut index: usize, proof: &RawProof) -> usize {
     match *proof {
-        Proof::Leaf => {
+        RawProof::Leaf => {
             let statement = to_tptp_statement(index, &Arc::new(Formula::F));
             println!("{}", statement);
             index + 1
         }
-        Proof::Branch(ref goal, ref children) => {
+        RawProof::Branch(ref goal, ref children) => {
             let formulae: Set<_> = goal
                 .formulae()
                 .filter(|f| !done.contains(*f))
@@ -105,7 +110,7 @@ fn print_refutation(done: Set<Arc<Formula>>, mut index: usize, proof: &Proof) ->
     }
 }
 
-pub fn szs_refutation(name: &str, done: Set<Arc<Formula>>, proof: &Proof) {
+pub fn szs_refutation(name: &str, done: Set<Arc<Formula>>, proof: &RawProof) {
     println!("% SZS status Theorem for {}", name);
     println!("% SZS output start Refutation for {}", name);
     print_refutation(done, 0, proof);
