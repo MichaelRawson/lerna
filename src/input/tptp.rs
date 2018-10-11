@@ -111,7 +111,7 @@ fn load_fof(role: FormulaRole, formula: &FofFormula) -> Result<Arc<Formula>, Loa
     let bound = Map::new();
     let formula = load_fof_formula(bound, 0, formula)?;
     match role {
-        FormulaRole::Axiom | FormulaRole::Hypothesis | FormulaRole::NegatedConjecture => {
+        FormulaRole::Axiom | FormulaRole::Hypothesis | FormulaRole::Definition | FormulaRole::Lemma | FormulaRole::Theorem | FormulaRole::Corollary | FormulaRole::NegatedConjecture => {
             Ok(formula)
         }
         FormulaRole::Conjecture => Ok(Formula::negate(formula)),
