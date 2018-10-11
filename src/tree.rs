@@ -11,15 +11,10 @@ use uct::uct;
 use util::{equal_choice, weighted_choice};
 
 #[derive(Debug)]
-enum GoalNodeContent {
-    Leaf,
-    Branch(Vec<Box<InferenceNode>>),
-}
-
-#[derive(Debug)]
 struct GoalNode {
     goal: Goal,
-    lock: RwLock<GoalNodeContent>,
+    children: RwLock<Vec<Box<InferenceNode>>>,
+    atomic_expanded: Atomic<bool>,
     atomic_visits: Atomic<usize>,
     atomic_distance: Atomic<u16>,
     atomic_complete: Atomic<bool>,
@@ -32,11 +27,16 @@ impl GoalNode {
 
         Arc::new(GoalNode {
             goal,
-            lock: RwLock::new(GoalNodeContent::Leaf),
+            children: RwLock::new(vec![]),
+            atomic_expanded: Atomic::new(false),
             atomic_visits: Atomic::new(1),
             atomic_distance: Atomic::new(distance),
             atomic_complete: Atomic::new(complete),
         })
+    }
+
+    fn expanded(&self) -> bool {
+        self.atomic_expanded.load(Relaxed)
     }
 
     fn visits(&self) -> usize {
@@ -64,12 +64,11 @@ impl GoalNode {
     }
 
     fn select(&self) -> Option<Arc<Self>> {
-        let locked = self.lock.read();
-        let inferences = match *locked {
-            GoalNodeContent::Branch(ref inferences) => inferences,
-            GoalNodeContent::Leaf => return None,
-        };
+        if !self.expanded() {
+            return None;
+        }
 
+        let inferences = self.children.read();
         let visits = self.visits();
         let distance = self.distance();
         let uct_scores: Vec<f64> = inferences
@@ -87,27 +86,25 @@ impl GoalNode {
             return false;
         }
 
-        let mut locked = self.lock.write();
-        let children = match *locked {
-            GoalNodeContent::Leaf => infer(self.goal.clone())
-                .into_iter()
-                .map(InferenceNode::new)
-                .collect(),
-            GoalNodeContent::Branch(_) => {
-                return false;
-            }
-        };
-        *locked = GoalNodeContent::Branch(children);
+        let mut children = self.children.write();
+        if self.expanded() {
+            return false;
+        }
+
+        *children = infer(self.goal.clone())
+            .into_iter()
+            .map(InferenceNode::new)
+            .collect();
+        self.atomic_expanded.store(true, Relaxed);
         true
     }
 
     fn update(&self) {
-        let locked = self.lock.read();
-        let children: &Vec<Box<InferenceNode>> = match *locked {
-            GoalNodeContent::Branch(ref x) => &x,
-            GoalNodeContent::Leaf => return,
-        };
-        for child in children {
+        if !self.expanded() {
+            return
+        }
+        let children = self.children.read();
+        for child in &*children {
             child.update();
         }
 
@@ -125,17 +122,19 @@ impl GoalNode {
     }
 
     fn proof(&self) -> Box<Proof> {
-        let lock = self.lock.read();
-        match *lock {
-            GoalNodeContent::Leaf => Box::new(Proof::leaf(&self.goal)),
-            GoalNodeContent::Branch(ref inferences) => Box::new(Proof::branch(
+        if !self.expanded() {
+            Box::new(Proof::leaf(&self.goal))
+        }
+        else {
+            let inferences = self.children.read();
+            Box::new(Proof::branch(
                 self.goal.clone(),
                 inferences
                     .iter()
                     .find(|x| x.complete())
                     .unwrap()
-                    .proofs(),
-            )),
+                    .proofs()
+            ))
         }
     }
 }
