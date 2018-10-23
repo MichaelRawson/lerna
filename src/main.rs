@@ -61,7 +61,7 @@ fn main() {
     info!("loading complete");
 
     let proof = {
-        let search = Search::new(&options.search, start_time, goal);
+        let search = Search::new(&options.search, start_time, &goal);
         info!("begin proving...");
         match search.run() {
             SearchResult::TimeOut => {
@@ -79,10 +79,10 @@ fn main() {
     };
 
     info!("reconstructing proof...");
-    // TODO reconstruct proof
+    let reconstruction = proof.reconstruct(goal);
     info!("...proof reconstructed");
 
-    output::proof_found(&options.output, set![], &proof);
+    // output::proof_found(&options.output, set![], &proof);
     info!("bye!");
     debug!("all good, exit(0)");
     exit(0)

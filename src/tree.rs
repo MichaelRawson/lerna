@@ -212,19 +212,17 @@ impl InferenceNode {
 }
 
 pub struct Tree {
-    start: Goal,
     root: Arc<GoalNode>,
 }
 
 impl Tree {
-    pub fn new(start: Goal) -> Self {
+    pub fn new(start: &Goal) -> Self {
         debug!("simplifying start goal...");
         let simplified = simplify(&start);
         debug!("...simplified.");
 
         Tree {
-            start,
-            root: GoalNode::leaf(simplified),
+            root: GoalNode::leaf(simplified)
         }
     }
 
@@ -238,8 +236,7 @@ impl Tree {
 
     pub fn proof(&self) -> Box<RawProof> {
         assert!(self.complete());
-        let proof = self.root.proof();
-        Box::new(RawProof::branch(self.start.clone(), vec![proof]))
+        self.root.proof()
     }
 
     pub fn total_visits(&self) -> usize {

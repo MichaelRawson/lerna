@@ -20,7 +20,7 @@ pub struct Search {
 }
 
 impl Search {
-    pub fn new(options: &SearchOptions, start_time: Timespec, start: Goal) -> Self {
+    pub fn new(options: &SearchOptions, start_time: Timespec, start: &Goal) -> Self {
         let duration = Duration::seconds(options.timeout as i64);
         let timeout = start_time + duration;
         debug!("timeout is {:?}", timeout);

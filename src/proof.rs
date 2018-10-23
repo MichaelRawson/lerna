@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::vec::Vec;
 
@@ -9,8 +10,6 @@ pub enum RawProof {
     Branch(Goal, Vec<Box<RawProof>>),
 }
 
-pub type Proof = Vec<(Arc<Formula>, Vec<usize>, &'static str)>;
-
 impl RawProof {
     pub fn leaf(goal: &Goal) -> Self {
         assert!(goal.complete(), "proof leaves must have complete goals");
@@ -21,7 +20,16 @@ impl RawProof {
         RawProof::Branch(goal, children)
     }
 
-    pub fn reconstruct(self) -> Proof {
+    pub fn reconstruct(self, start: Goal) -> ReconstructedProof {
         panic!("")
     }
+}
+
+pub struct ReconstructedProof {
+    goal: Goal,
+    justification: BTreeMap<Arc<Formula>, (&'static str, Vec<Arc<Formula>>)>,
+    children: Vec<ReconstructedProof>
+}
+
+impl ReconstructedProof {
 }
