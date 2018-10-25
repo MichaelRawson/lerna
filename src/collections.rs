@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 
 pub type Set<T> = im::OrdSet<T>;
 macro_rules! set {
-    ($($x:tt)*) => {ordset![$($x)*]}
+    [$($x:tt)*] => {ordset![$($x)*]}
 }
 pub type Map<K, V> = im::OrdMap<K, V>;
 macro_rules! map {
-    ($($x:tt)*) => {ordmap![$($x)*]}
+    [$($x:tt)*] => {ordmap![$($x)*]}
 }
 
 pub struct BiMap<A, B>

@@ -9,7 +9,7 @@ use log::LevelFilter::{Info, Trace, Warn};
 use collections::Set;
 use formula::Formula;
 use options::{OutputOptions, OutputOptionsLanguage, OutputOptionsLoggingLevel};
-use proof::RawProof;
+use proof::Proof;
 
 pub fn os_error(options: &OutputOptions) {
     match options.language {
@@ -29,7 +29,7 @@ pub fn unsupported(options: &OutputOptions) {
     }
 }
 
-pub fn proof_found(options: &OutputOptions, original: Set<Arc<Formula>>, proof: &RawProof) {
+pub fn proof_found(options: &OutputOptions, original: &Set<Arc<Formula>>, proof: Proof) {
     match options.language {
         OutputOptionsLanguage::TPTP => tptp::szs_refutation(&options.name, original, proof),
     }

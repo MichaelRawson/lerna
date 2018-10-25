@@ -10,7 +10,7 @@ use tptp::syntax::FofTerm::*;
 use collections::Set;
 use formula::Formula;
 use formula::Formula::*;
-use proof::RawProof;
+use proof::Proof;
 use term::Term;
 use term::Term::*;
 use symbol::Flavour;
@@ -90,39 +90,31 @@ fn to_tptp_statement(index: usize, f: &Arc<Formula>) -> syntax::Statement {
     syntax::Statement::Fof(name, role, formula, None)
 }
 
-fn print_refutation(done: Set<Arc<Formula>>, mut index: usize, proof: &RawProof) -> usize {
-    match *proof {
-        RawProof::Leaf => {
-            let statement = to_tptp_statement(index, &Arc::new(Formula::F));
-            println!("{}", statement);
-            index + 1
-        }
-        RawProof::Branch(ref goal, ref children) => {
-            let formulae: Set<_> = goal
-                .formulae()
-                .filter(|f| !done.contains(*f))
-                .cloned()
-                .collect();
-            if !formulae.is_empty() {
-                let conjunction = Arc::new(Formula::And(formulae.clone()));
-                let statement = to_tptp_statement(index, &conjunction);
-                println!("{}", statement);
-                index += 1;
-            }
+fn print_refutation(start: &Set<Arc<Formula>>, proof: Proof, mut index: usize) -> usize {
+    let formulae = proof.goal.as_refutation();
+    let fresh: Set<_> = formulae.iter()
+        .filter(|f| !start.contains(*f))
+        .map(|f| f.clone())
+        .collect();
 
-            let done = done.union(formulae.clone());
-            for child in children {
-                index = print_refutation(done.clone(), index, child);
-            }
-            index
-        }
+    if !fresh.is_empty() {
+        let conjunction = Arc::new(Formula::And(fresh));
+        let statement = to_tptp_statement(index, &conjunction);
+        println!("{}", statement);
+        index += 1;
     }
+
+    for child in proof.children {
+        index = print_refutation(&formulae, child, index);
+    }
+
+    index
 }
 
-pub fn szs_refutation(name: &str, done: Set<Arc<Formula>>, proof: &RawProof) {
+pub fn szs_refutation(name: &str, start: &Set<Arc<Formula>>, proof: Proof) {
     println!("% SZS status Theorem for {}", name);
     println!("% SZS output start Refutation for {}", name);
-    print_refutation(done, 0, proof);
+    print_refutation(start, proof, 0);
     println!("% SZS output end Refutation for {}", name);
     debug!("...statements printed");
 }

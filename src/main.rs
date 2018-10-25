@@ -16,11 +16,11 @@ extern crate tptp;
 
 #[macro_use]
 mod collections;
+
 mod formula;
 mod goal;
 mod inferences;
 mod input;
-mod justification;
 mod options;
 mod output;
 mod proof;
@@ -60,29 +60,22 @@ fn main() {
     });
     info!("loading complete");
 
-    let proof = {
-        let search = Search::new(&options.search, start_time, &goal);
-        info!("begin proving...");
-        match search.run() {
-            SearchResult::TimeOut => {
-                info!("...timed out");
-                debug!("time out, reporting...");
-                output::time_out(&options.output);
-                debug!("...proof failed, exit(1)");
-                exit(1)
-            }
-            SearchResult::ProofFound(proof) => {
-                info!("...proof found");
-                proof
-            }
+    let search = Search::new(&options.search, start_time, &goal);
+    info!("begin proving...");
+    match search.run() {
+        SearchResult::TimeOut => {
+            info!("...timed out");
+            debug!("time out, reporting...");
+            output::time_out(&options.output);
+            debug!("...proof failed, exit(1)");
+            exit(1)
         }
-    };
+        SearchResult::ProofFound(proof) => {
+            info!("...proof found");
+            output::proof_found(&options.output, &goal.as_refutation(), proof);
+        }
+    }
 
-    info!("reconstructing proof...");
-    let reconstruction = proof.reconstruct(goal);
-    info!("...proof reconstructed");
-
-    // output::proof_found(&options.output, set![], &proof);
     info!("bye!");
     debug!("all good, exit(0)");
     exit(0)

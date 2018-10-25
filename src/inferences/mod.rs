@@ -11,18 +11,18 @@ fn all_inferences(goal: &Goal) -> Set<Inferred> {
 }
 
 fn inferences(goal: Goal) -> Set<Inferred> {
-    let all = all_inferences(&goal);
-    if all.is_empty() {
-        set![set![goal]]
-    } else {
-        all
-    }
+    let mut all = all_inferences(&goal);
+    all.insert(set![goal]); //ensure never empty
+    all
 }
 
 pub fn infer(goal: Goal) -> Set<Inferred> {
     let result: Set<Inferred> = inferences(goal)
         .into_iter()
-        .map(|inferred| inferred.iter().map(simplify).collect::<Inferred>())
+        .map(|inferred| inferred.iter()
+             .map(simplify)
+             .collect::<Inferred>()
+        )
         .collect();
     result
 }

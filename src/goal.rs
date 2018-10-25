@@ -3,7 +3,6 @@ use std::sync::Arc;
 use collections::Set;
 use formula::Formula;
 use symbol::Symbol;
-use term::Term;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Goal {
@@ -50,7 +49,7 @@ impl Goal {
         self.symbols.iter()
     }
 
-    pub fn replace(&self, to: &Arc<Term>, from: &Arc<Term>) -> Goal {
-        Goal::new(self.formulae().map(|f| f.replace(to, from)).collect())
+    pub fn as_refutation(self) -> Set<Arc<Formula>> {
+        self.refute
     }
 }

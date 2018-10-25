@@ -4,14 +4,14 @@ use time::{get_time, Duration, Timespec};
 
 use goal::Goal;
 use options::SearchOptions;
-use proof::RawProof;
+use proof::Proof;
 use tree::Tree;
 
 const STACK_SIZE: usize = 10 * 1024 * 1024;
 
 pub enum SearchResult {
     TimeOut,
-    ProofFound(Box<RawProof>),
+    ProofFound(Proof),
 }
 
 pub struct Search {

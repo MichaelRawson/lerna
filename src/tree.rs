@@ -8,7 +8,7 @@ use parking_lot::RwLock;
 use collections::Set;
 use goal::Goal;
 use inferences::infer;
-use proof::RawProof;
+use proof::Proof;
 use random::{equal_choice, weighted_choice};
 use simplifications::simplify;
 
@@ -130,15 +130,16 @@ impl GoalNode {
         self.atomic_distance.store(distance, Relaxed);
     }
 
-    fn proof(&self) -> Box<RawProof> {
+    fn proof(&self) -> Proof {
         if !self.expanded() {
-            Box::new(RawProof::leaf(&self.goal))
+            Proof::leaf(self.goal.clone())
         } else {
             let inferences = self.children.read();
-            Box::new(RawProof::branch(
+            Proof::branch(
                 self.goal.clone(),
-                inferences.iter().find(|x| x.complete()).unwrap().proofs(),
-            ))
+                inferences.iter()
+                    .find(|x| x.complete()).unwrap().proofs(),
+            )
         }
     }
 }
@@ -206,7 +207,7 @@ impl InferenceNode {
         self.atomic_distance.store(distance, Relaxed);
     }
 
-    fn proofs(&self) -> Vec<Box<RawProof>> {
+    fn proofs(&self) -> Vec<Proof> {
         self.subgoals.iter().map(|x| x.proof()).collect()
     }
 }
@@ -234,7 +235,7 @@ impl Tree {
         self.root.step();
     }
 
-    pub fn proof(&self) -> Box<RawProof> {
+    pub fn proof(self) -> Proof {
         assert!(self.complete());
         self.root.proof()
     }
