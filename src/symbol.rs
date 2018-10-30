@@ -2,12 +2,12 @@ use atomic::Atomic;
 use atomic::Ordering::Relaxed;
 use parking_lot::Mutex;
 
-use collections::BiMap;
+use types::BiMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Flavour {
     Functor,
-    Distinct
+    Distinct,
 }
 
 lazy_static! {

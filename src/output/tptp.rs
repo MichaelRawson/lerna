@@ -1,5 +1,5 @@
 use std::fmt::Arguments;
-use std::sync::Arc;
+use types::Dag;
 
 use fern::FormatCallback;
 use log::Record;
@@ -7,37 +7,33 @@ use tptp::syntax;
 use tptp::syntax::FofFormula::*;
 use tptp::syntax::FofTerm::*;
 
-use collections::Set;
 use formula::Formula;
 use formula::Formula::*;
 use proof::Proof;
+use symbol::Flavour;
 use term::Term;
 use term::Term::*;
-use symbol::Flavour;
+use types::Set;
 
 fn to_tptp_bound(bound: usize) -> String {
     format!("X{}", bound)
 }
 
-fn to_tptp_term(t: &Arc<Term>, bound_depth: usize) -> Box<syntax::FofTerm> {
+fn to_tptp_term(t: &Dag<Term>, bound_depth: usize) -> Box<syntax::FofTerm> {
     Box::new(match **t {
         Var(x) => Variable(to_tptp_bound(bound_depth - 1 - x)),
-        Fun(f, ref ts) => {
-            match f.flavour() {
-                Flavour::Functor => {
-                    let ts = ts.iter().map(|t| to_tptp_term(t, bound_depth)).collect();
-                    let name = syntax::Name::Atomic(f.name());
-                    Functor(name, ts)
-                },
-                Flavour::Distinct => {
-                    DistinctObject(f.name())
-                }
+        Fun(f, ref ts) => match f.flavour() {
+            Flavour::Functor => {
+                let ts = ts.iter().map(|t| to_tptp_term(t, bound_depth)).collect();
+                let name = syntax::Name::Atomic(f.name());
+                Functor(name, ts)
             }
-        }
+            Flavour::Distinct => DistinctObject(f.name()),
+        },
     })
 }
 
-fn to_tptp_formula(f: &Arc<Formula>, bound_depth: usize) -> Box<syntax::FofFormula> {
+fn to_tptp_formula(f: &Dag<Formula>, bound_depth: usize) -> Box<syntax::FofFormula> {
     Box::new(match **f {
         T => Boolean(true),
         F => Boolean(false),
@@ -51,7 +47,10 @@ fn to_tptp_formula(f: &Arc<Formula>, bound_depth: usize) -> Box<syntax::FofFormu
             let name = syntax::Name::Atomic(p.name());
             Predicate(name, ts)
         }
-        Not(ref p) => Unary(syntax::FofUnaryConnective::Not, to_tptp_formula(p, bound_depth)),
+        Not(ref p) => Unary(
+            syntax::FofUnaryConnective::Not,
+            to_tptp_formula(p, bound_depth),
+        ),
         And(ref ps) => {
             let ps = ps.iter().map(|p| to_tptp_formula(p, bound_depth)).collect();
             Assoc(syntax::FofAssocConnective::And, ps)
@@ -83,22 +82,23 @@ fn to_tptp_formula(f: &Arc<Formula>, bound_depth: usize) -> Box<syntax::FofFormu
     })
 }
 
-fn to_tptp_statement(index: usize, f: &Arc<Formula>) -> syntax::Statement {
+fn to_tptp_statement(index: usize, f: &Dag<Formula>) -> syntax::Statement {
     let name = syntax::Name::Integer(format!("{}", index));
     let role = syntax::FormulaRole::Plain;
     let formula = to_tptp_formula(f, 0);
     syntax::Statement::Fof(name, role, formula, None)
 }
 
-fn print_refutation(start: &Set<Arc<Formula>>, proof: Proof, mut index: usize) -> usize {
-    let formulae = proof.goal.as_refutation();
-    let fresh: Set<_> = formulae.iter()
+fn print_refutation(start: &Set<Dag<Formula>>, proof: Proof, mut index: usize) -> usize {
+    let formulae = proof.goal.refutation();
+    let fresh: Set<_> = formulae
+        .iter()
         .filter(|f| !start.contains(*f))
-        .map(|f| f.clone())
+        .cloned()
         .collect();
 
     if !fresh.is_empty() {
-        let conjunction = Arc::new(Formula::And(fresh));
+        let conjunction = Dag::new(Formula::And(fresh));
         let statement = to_tptp_statement(index, &conjunction);
         println!("{}", statement);
         index += 1;
@@ -111,7 +111,7 @@ fn print_refutation(start: &Set<Arc<Formula>>, proof: Proof, mut index: usize) -
     index
 }
 
-pub fn szs_refutation(name: &str, start: &Set<Arc<Formula>>, proof: Proof) {
+pub fn szs_refutation(name: &str, start: &Set<Dag<Formula>>, proof: Proof) {
     println!("% SZS status Theorem for {}", name);
     println!("% SZS output start Refutation for {}", name);
     print_refutation(start, proof, 0);

@@ -1,16 +1,16 @@
-use std::sync::Arc;
 use std::vec::Vec;
+use types::Dag;
 
 use atomic::Atomic;
 use atomic::Ordering::Relaxed;
 use parking_lot::RwLock;
 
-use collections::Set;
 use goal::Goal;
 use inferences::infer;
 use proof::Proof;
 use random::{equal_choice, weighted_choice};
 use simplifications::simplify;
+use types::Set;
 
 pub fn uct(score: f64, parent_visits: usize, child_visits: usize) -> f64 {
     #[allow(non_snake_case)]
@@ -30,11 +30,11 @@ struct GoalNode {
 }
 
 impl GoalNode {
-    fn leaf(goal: Goal) -> Arc<Self> {
+    fn leaf(goal: Goal) -> Dag<Self> {
         let complete = goal.complete();
         let distance = if complete { 0 } else { 1 };
 
-        Arc::new(GoalNode {
+        Dag::new(GoalNode {
             goal,
             children: RwLock::new(vec![]),
             atomic_expanded: Atomic::new(false),
@@ -72,7 +72,7 @@ impl GoalNode {
         should_update
     }
 
-    fn select(&self) -> Option<Arc<Self>> {
+    fn select(&self) -> Option<Dag<Self>> {
         if !self.expanded() {
             return None;
         }
@@ -137,8 +137,7 @@ impl GoalNode {
             let inferences = self.children.read();
             Proof::branch(
                 self.goal.clone(),
-                inferences.iter()
-                    .find(|x| x.complete()).unwrap().proofs(),
+                inferences.iter().find(|x| x.complete()).unwrap().proofs(),
             )
         }
     }
@@ -146,7 +145,7 @@ impl GoalNode {
 
 #[derive(Debug)]
 struct InferenceNode {
-    subgoals: Vec<Arc<GoalNode>>,
+    subgoals: Vec<Dag<GoalNode>>,
     atomic_visits: Atomic<usize>,
     atomic_distance: Atomic<u16>,
     atomic_complete: Atomic<bool>,
@@ -184,8 +183,8 @@ impl InferenceNode {
         uct(score, parent_visits + 1, child_visits)
     }
 
-    fn select(&self) -> Option<Arc<GoalNode>> {
-        let available: Vec<&Arc<GoalNode>> = self
+    fn select(&self) -> Option<Dag<GoalNode>> {
+        let available: Vec<&Dag<GoalNode>> = self
             .subgoals
             .iter()
             .filter(|goal| !goal.complete())
@@ -213,7 +212,7 @@ impl InferenceNode {
 }
 
 pub struct Tree {
-    root: Arc<GoalNode>,
+    root: Dag<GoalNode>,
 }
 
 impl Tree {
@@ -223,7 +222,7 @@ impl Tree {
         debug!("...simplified.");
 
         Tree {
-            root: GoalNode::leaf(simplified)
+            root: GoalNode::leaf(simplified),
         }
     }
 

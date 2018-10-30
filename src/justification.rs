@@ -1,12 +1,12 @@
-use std::sync::Arc;
+use types::Dag;
 
-use collections::Set;
+use types::Set;
 use formula::Formula;
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Justification {
     pub derived: Goal,
-    pub from: Set<Arc<Formula>>,
+    pub from: Set<Dag<Formula>>,
     pub method: &'static str
 }
 

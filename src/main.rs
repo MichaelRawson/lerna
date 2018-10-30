@@ -15,7 +15,7 @@ extern crate time;
 extern crate tptp;
 
 #[macro_use]
-mod collections;
+mod types;
 
 mod formula;
 mod goal;
@@ -72,7 +72,7 @@ fn main() {
         }
         SearchResult::ProofFound(proof) => {
             info!("...proof found");
-            output::proof_found(&options.output, &goal.as_refutation(), proof);
+            output::proof_found(&options.output, &goal.refutation(), proof);
         }
     }
 

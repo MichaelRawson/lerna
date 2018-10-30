@@ -1,6 +1,9 @@
 use im;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
+
+pub type Dag<T> = Arc<T>;
 
 pub type Set<T> = im::OrdSet<T>;
 macro_rules! set {

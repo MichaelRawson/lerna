@@ -1,8 +1,8 @@
 mod complete;
 
-use collections::Set;
 use goal::Goal;
 use simplifications::simplify;
+use types::Set;
 
 pub type Inferred = Set<Goal>;
 
@@ -19,10 +19,7 @@ fn inferences(goal: Goal) -> Set<Inferred> {
 pub fn infer(goal: Goal) -> Set<Inferred> {
     let result: Set<Inferred> = inferences(goal)
         .into_iter()
-        .map(|inferred| inferred.iter()
-             .map(simplify)
-             .collect::<Inferred>()
-        )
+        .map(|inferred| inferred.iter().map(simplify).collect::<Inferred>())
         .collect();
     result
 }

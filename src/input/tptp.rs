@@ -1,21 +1,21 @@
-use std::sync::Arc;
+use types::Dag;
 
 use tptp;
-use tptp::syntax::*;
 use tptp::error::*;
+use tptp::syntax::*;
 
-use collections::{Map, Set};
 use formula::Formula;
 use goal::Goal;
 use input::LoadError;
-use symbol::{Symbol, Flavour};
+use symbol::{Flavour, Symbol};
 use term::Term;
 use term::Term::*;
+use types::{Map, Set};
 
 fn load_fof_name(name: Name) -> String {
     match name {
         Name::Atomic(x) => x,
-        Name::Integer(x) => x
+        Name::Integer(x) => x,
     }
 }
 
@@ -23,10 +23,10 @@ fn load_fof_term(
     bound: &Map<String, usize>,
     bound_depth: usize,
     term: FofTerm,
-) -> Result<Arc<Term>, LoadError> {
+) -> Result<Dag<Term>, LoadError> {
     match term {
         FofTerm::Variable(x) => match bound.get(&x) {
-            Some(x) => Ok(Arc::new(Var(bound_depth - 1 - x))),
+            Some(x) => Ok(Dag::new(Var(bound_depth - 1 - x))),
             None => {
                 error!("unbound variable: {}", x);
                 Err(LoadError::InputError)
@@ -41,11 +41,11 @@ fn load_fof_term(
             for arg in fof_args {
                 args.push(load_fof_term(&bound, bound_depth, *arg)?);
             }
-            Ok(Arc::new(Fun(symbol, args)))
-        },
+            Ok(Dag::new(Fun(symbol, args)))
+        }
         FofTerm::DistinctObject(name) => {
             let symbol = Symbol::get(name, 0, Flavour::Distinct);
-            Ok(Arc::new(Fun(symbol, vec![])))
+            Ok(Dag::new(Fun(symbol, vec![])))
         }
     }
 }
@@ -54,20 +54,20 @@ fn load_fof_formula(
     mut bound: Map<String, usize>,
     bound_depth: usize,
     formula: FofFormula,
-) -> Result<Arc<Formula>, LoadError> {
+) -> Result<Dag<Formula>, LoadError> {
     Ok(match formula {
-        FofFormula::Boolean(b) => Arc::new(if b { Formula::T } else { Formula::F }),
+        FofFormula::Boolean(b) => Dag::new(if b { Formula::T } else { Formula::F }),
         FofFormula::Infix(op, x, y) => {
-            let equality = Arc::new(Formula::Eql(
+            let equality = Dag::new(Formula::Eql(
                 load_fof_term(&bound, bound_depth, *x)?,
                 load_fof_term(&bound, bound_depth, *y)?,
             ));
             use self::InfixEquality::*;
             match op {
                 Equal => equality,
-                NotEqual => equality.negated()
+                NotEqual => equality.negated(),
             }
-        },
+        }
         FofFormula::Predicate(name, fof_args) => {
             let name = load_fof_name(name);
             let arity = fof_args.len();
@@ -77,24 +77,30 @@ fn load_fof_formula(
             for arg in fof_args {
                 args.push(load_fof_term(&bound, bound_depth, *arg)?);
             }
-            Arc::new(Formula::Prd(symbol, args))
+            Dag::new(Formula::Prd(symbol, args))
         }
         FofFormula::Unary(op, f) => {
             let f = load_fof_formula(bound.clone(), bound_depth, *f)?;
-            Arc::new(match op {
+            Dag::new(match op {
                 FofUnaryConnective::Not => Formula::Not(f),
             })
         }
         FofFormula::NonAssoc(op, left, right) => {
             let left = load_fof_formula(bound.clone(), bound_depth, *left)?;
             let right = load_fof_formula(bound.clone(), bound_depth, *right)?;
-            Arc::new(match op {
+            Dag::new(match op {
                 FofNonAssocConnective::LRImplies => Formula::Imp(left, right),
                 FofNonAssocConnective::RLImplies => Formula::Imp(right, left),
                 FofNonAssocConnective::Equivalent => Formula::Eqv(left, right),
-                FofNonAssocConnective::NotEquivalent => Formula::Not(Arc::new(Formula::Eqv(left, right))),
-                FofNonAssocConnective::NotOr => Formula::Not(Arc::new(Formula::Or(set![left, right]))),
-                FofNonAssocConnective::NotAnd => Formula::Not(Arc::new(Formula::And(set![left, right]))),
+                FofNonAssocConnective::NotEquivalent => {
+                    Formula::Not(Dag::new(Formula::Eqv(left, right)))
+                }
+                FofNonAssocConnective::NotOr => {
+                    Formula::Not(Dag::new(Formula::Or(set![left, right])))
+                }
+                FofNonAssocConnective::NotAnd => {
+                    Formula::Not(Dag::new(Formula::And(set![left, right])))
+                }
             })
         }
         FofFormula::Assoc(op, fof_args) => {
@@ -102,7 +108,7 @@ fn load_fof_formula(
             for arg in fof_args {
                 args.insert(load_fof_formula(bound.clone(), bound_depth, *arg)?);
             }
-            Arc::new(match op {
+            Dag::new(match op {
                 FofAssocConnective::And => Formula::And(args),
                 FofAssocConnective::Or => Formula::Or(args),
             })
@@ -122,7 +128,7 @@ fn load_fof_formula(
 
             let mut f = load_fof_formula(bound, depth, *f)?;
             for _ in 0..num_bound {
-                f = Arc::new(quantifier(f));
+                f = Dag::new(quantifier(f));
             }
             f
         }
@@ -144,10 +150,9 @@ fn should_negate(role: FormulaRole) -> Result<bool, LoadError> {
             Err(LoadError::Unsupported)
         }
     }
-
 }
 
-fn load_fof(role: FormulaRole, formula: FofFormula) -> Result<Arc<Formula>, LoadError> {
+fn load_fof(role: FormulaRole, formula: FofFormula) -> Result<Dag<Formula>, LoadError> {
     let bound = map![];
     let formula = load_fof_formula(bound, 0, formula)?;
     if should_negate(role)? {
@@ -160,27 +165,26 @@ fn load_fof(role: FormulaRole, formula: FofFormula) -> Result<Arc<Formula>, Load
 fn fof_term_bound(term: &FofTerm) -> Set<String> {
     match *term {
         FofTerm::Variable(ref x) => set![x.clone()],
-        FofTerm::Functor(_, ref args) => Set::unions(
-            args.iter().map(|arg| fof_term_bound(arg))),
-        FofTerm::DistinctObject(_) => set![]
+        FofTerm::Functor(_, ref args) => Set::unions(args.iter().map(|arg| fof_term_bound(arg))),
+        FofTerm::DistinctObject(_) => set![],
     }
 }
-
 
 fn cnf_literal_bound(literal: &CnfLiteral) -> Set<String> {
     let literal = match literal {
         CnfLiteral::Literal(f) => f,
-        CnfLiteral::NegatedLiteral(f) => f
+        CnfLiteral::NegatedLiteral(f) => f,
     };
 
     match **literal {
         FofFormula::Boolean(_) => set![],
-        FofFormula::Infix(_, ref left, ref right) => fof_term_bound(left)
-            .union(fof_term_bound(right)),
-        FofFormula::Predicate(_, ref args) => Set::unions(
-            args.iter().map(|arg| fof_term_bound(arg))
-        ),
-        _ => unreachable!()
+        FofFormula::Infix(_, ref left, ref right) => {
+            fof_term_bound(left).union(fof_term_bound(right))
+        }
+        FofFormula::Predicate(_, ref args) => {
+            Set::unions(args.iter().map(|arg| fof_term_bound(arg)))
+        }
+        _ => unreachable!(),
     }
 }
 
@@ -191,36 +195,26 @@ fn cnf_bound(formula: &CnfFormula) -> Set<String> {
 fn cnf_literal_to_fof(literal: CnfLiteral) -> Box<FofFormula> {
     match literal {
         CnfLiteral::Literal(f) => f,
-        CnfLiteral::NegatedLiteral(f) => Box::new(FofFormula::Unary(
-            FofUnaryConnective::Not,
-            f
-        ))
+        CnfLiteral::NegatedLiteral(f) => Box::new(FofFormula::Unary(FofUnaryConnective::Not, f)),
     }
 }
 
-fn load_cnf(role: FormulaRole, formula: CnfFormula) -> Result<Arc<Formula>, LoadError> {
+fn load_cnf(role: FormulaRole, formula: CnfFormula) -> Result<Dag<Formula>, LoadError> {
     let bound = cnf_bound(&formula).into_iter().collect();
     let mut disjunction = FofFormula::Assoc(
         FofAssocConnective::Or,
-        formula.0.into_iter().map(cnf_literal_to_fof).collect()
+        formula.0.into_iter().map(cnf_literal_to_fof).collect(),
     );
 
     if should_negate(role)? {
-        disjunction = FofFormula::Unary(
-            FofUnaryConnective::Not,
-            Box::new(disjunction)
-        );
+        disjunction = FofFormula::Unary(FofUnaryConnective::Not, Box::new(disjunction));
     }
 
-    let quantified = FofFormula::Quantified(
-        FofQuantifier::Forall,
-        bound,
-        Box::new(disjunction)
-    );
+    let quantified = FofFormula::Quantified(FofQuantifier::Forall, bound, Box::new(disjunction));
     load_fof_formula(map![], 0, quantified)
 }
 
-fn load_statement(statement: Statement) -> Result<Arc<Formula>, LoadError> {
+fn load_statement(statement: Statement) -> Result<Dag<Formula>, LoadError> {
     match statement {
         Statement::Fof(name, role, formula, _) => {
             debug!("encountered FOF input \"{}\"", name);
