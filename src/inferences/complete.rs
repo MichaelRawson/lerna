@@ -9,7 +9,7 @@ use term::Term;
 use types::Set;
 
 fn contradiction() -> Inferred {
-    set![Goal::new(set![Dag::new(F)])]
+    set![Goal::new(set![dag!(F)])]
 }
 
 fn equality(goal: &Goal, left: &Dag<Term>, right: &Dag<Term>) -> Inferred {
@@ -19,7 +19,7 @@ fn equality(goal: &Goal, left: &Dag<Term>, right: &Dag<Term>) -> Inferred {
         .formulae()
         .map(|f| f.replace(smaller, larger))
         .collect();
-    replaced.insert(Dag::new(Eql(left.clone(), right.clone())));
+    replaced.insert(dag!(Eql(left.clone(), right.clone())));
     set![Goal::new(replaced)]
 }
 
@@ -29,8 +29,8 @@ fn negated(goal: &Goal, p: &Dag<Formula>) -> Set<Inferred> {
     }
 
     match **p {
-        T => set![set![goal.with(Dag::new(F))]],
-        F => set![set![goal.with(Dag::new(T))]],
+        T => set![set![goal.with(dag!(F))]],
+        F => set![set![goal.with(dag!(T))]],
         Eql(ref p, ref q) if p == q => set![contradiction()],
         Eql(_, _) => set![],
         Prd(_, _) => set![],
@@ -42,11 +42,11 @@ fn negated(goal: &Goal, p: &Dag<Formula>) -> Set<Inferred> {
             set![set![goal.with(npimpq), goal.with(nqimpp)]]
         }
         And(ref ps) => {
-            let nps = Dag::new(Or(ps.iter().map(|x| x.negated()).collect()));
+            let nps = dag!(Or(ps.iter().map(|x| x.negated()).collect()));
             set![set![goal.with(nps)]]
         }
         Or(ref ps) => {
-            let nps = Dag::new(And(ps.iter().map(|x| x.negated()).collect()));
+            let nps = dag!(And(ps.iter().map(|x| x.negated()).collect()));
             set![set![goal.with(nps)]]
         }
         Ex(ref p) => goal
@@ -65,8 +65,8 @@ fn formula_inferences(goal: &Goal, f: &Dag<Formula>) -> Set<Inferred> {
         Not(ref p) => negated(goal, p),
         Imp(ref p, ref q) => set![set![goal.with(p.negated()), goal.with(q.clone())]],
         Eqv(ref p, ref q) => {
-            let pimpq = Dag::new(Imp(p.clone(), q.clone()));
-            let qimpp = Dag::new(Imp(q.clone(), p.clone()));
+            let pimpq = dag!(Imp(p.clone(), q.clone()));
+            let qimpp = dag!(Imp(q.clone(), p.clone()));
             set![set![goal.with(pimpq).with(qimpp)]]
         }
         And(ref ps) => set![set![goal.with_many(ps.clone())]],

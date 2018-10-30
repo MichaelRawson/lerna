@@ -34,7 +34,7 @@ impl GoalNode {
         let complete = goal.complete();
         let distance = if complete { 0 } else { 1 };
 
-        Dag::new(GoalNode {
+        dag!(GoalNode {
             goal,
             children: RwLock::new(vec![]),
             atomic_expanded: Atomic::new(false),

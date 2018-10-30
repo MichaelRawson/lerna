@@ -98,7 +98,7 @@ fn print_refutation(start: &Set<Dag<Formula>>, proof: Proof, mut index: usize) -
         .collect();
 
     if !fresh.is_empty() {
-        let conjunction = Dag::new(Formula::And(fresh));
+        let conjunction = dag!(Formula::And(fresh));
         let statement = to_tptp_statement(index, &conjunction);
         println!("{}", statement);
         index += 1;

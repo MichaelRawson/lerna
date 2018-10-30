@@ -25,7 +25,7 @@ use self::Formula::*;
 
 impl Formula {
     pub fn negated(&self) -> Dag<Formula> {
-        Dag::new(Formula::Not(Dag::new(self.clone())))
+        dag!(Formula::Not(dag!(self.clone())))
     }
 
     pub fn symbols(&self) -> Set<Symbol> {
@@ -45,61 +45,61 @@ impl Formula {
 
     pub fn replace(&self, to: &Dag<Term>, from: &Dag<Term>) -> Dag<Formula> {
         match *self {
-            T => Dag::new(T),
-            F => Dag::new(F),
+            T => dag!(T),
+            F => dag!(F),
             Eql(ref left, ref right) => {
-                Dag::new(Eql(left.replace(to, from), right.replace(to, from)))
+                dag!(Eql(left.replace(to, from), right.replace(to, from)))
             }
             Prd(p, ref args) => {
-                Dag::new(Prd(p, args.iter().map(|t| t.replace(to, from)).collect()))
+                dag!(Prd(p, args.iter().map(|t| t.replace(to, from)).collect()))
             }
-            Not(ref p) => Dag::new(Not(p.replace(to, from))),
-            Imp(ref p, ref q) => Dag::new(Imp(p.replace(to, from), q.replace(to, from))),
-            Eqv(ref p, ref q) => Dag::new(Eqv(p.replace(to, from), q.replace(to, from))),
-            And(ref ps) => Dag::new(And(ps.iter().map(|p| p.replace(to, from)).collect())),
-            Or(ref ps) => Dag::new(Or(ps.iter().map(|p| p.replace(to, from)).collect())),
-            All(ref p) => Dag::new(All(p.replace(to, from))),
-            Ex(ref p) => Dag::new(Ex(p.replace(to, from))),
+            Not(ref p) => dag!(Not(p.replace(to, from))),
+            Imp(ref p, ref q) => dag!(Imp(p.replace(to, from), q.replace(to, from))),
+            Eqv(ref p, ref q) => dag!(Eqv(p.replace(to, from), q.replace(to, from))),
+            And(ref ps) => dag!(And(ps.iter().map(|p| p.replace(to, from)).collect())),
+            Or(ref ps) => dag!(Or(ps.iter().map(|p| p.replace(to, from)).collect())),
+            All(ref p) => dag!(All(p.replace(to, from))),
+            Ex(ref p) => dag!(Ex(p.replace(to, from))),
         }
     }
 
     pub fn instantiate(&self, i: &Dag<Term>, index: usize) -> Dag<Formula> {
         match *self {
-            T => Dag::new(T),
-            F => Dag::new(F),
-            Prd(p, ref args) => Dag::new(Prd(
+            T => dag!(T),
+            F => dag!(F),
+            Prd(p, ref args) => dag!(Prd(
                 p,
                 args.iter().map(|t| t.instantiate(i, index)).collect(),
             )),
             Eql(ref left, ref right) => {
-                Dag::new(Eql(left.instantiate(i, index), right.instantiate(i, index)))
+                dag!(Eql(left.instantiate(i, index), right.instantiate(i, index)))
             }
-            Not(ref p) => Dag::new(Not(p.instantiate(i, index))),
+            Not(ref p) => dag!(Not(p.instantiate(i, index))),
             Imp(ref left, ref right) => {
-                Dag::new(Imp(left.instantiate(i, index), right.instantiate(i, index)))
+                dag!(Imp(left.instantiate(i, index), right.instantiate(i, index)))
             }
             Eqv(ref left, ref right) => {
-                Dag::new(Eqv(left.instantiate(i, index), right.instantiate(i, index)))
+                dag!(Eqv(left.instantiate(i, index), right.instantiate(i, index)))
             }
-            And(ref ps) => Dag::new(And(ps.iter().map(|p| p.instantiate(i, index)).collect())),
-            Or(ref ps) => Dag::new(Or(ps.iter().map(|p| p.instantiate(i, index)).collect())),
-            All(ref p) => Dag::new(All(p.instantiate(i, index + 1))),
-            Ex(ref p) => Dag::new(Ex(p.instantiate(i, index + 1))),
+            And(ref ps) => dag!(And(ps.iter().map(|p| p.instantiate(i, index)).collect())),
+            Or(ref ps) => dag!(Or(ps.iter().map(|p| p.instantiate(i, index)).collect())),
+            All(ref p) => dag!(All(p.instantiate(i, index + 1))),
+            Ex(ref p) => dag!(Ex(p.instantiate(i, index + 1))),
         }
     }
 
     pub fn instantiate_with_constant(&self) -> Dag<Formula> {
-        let constant = Dag::new(Fun(Symbol::fresh(0), vec![]));
+        let constant = dag!(Fun(Symbol::fresh(0), vec![]));
         self.instantiate(&constant, 0)
     }
 
     pub fn instantiate_with_symbol(&self, symbol: Symbol) -> Dag<Formula> {
         let arity = symbol.arity();
-        let vars = (0..arity).map(|i| Dag::new(Var(i))).collect();
-        let term = Dag::new(Fun(symbol, vars));
+        let vars = (0..arity).map(|i| dag!(Var(i))).collect();
+        let term = dag!(Fun(symbol, vars));
         let mut f = self.instantiate(&term, 0);
         for _ in 0..arity {
-            f = Dag::new(All(f));
+            f = dag!(All(f));
         }
         f
     }

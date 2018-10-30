@@ -28,9 +28,9 @@ impl Term {
             from.clone()
         } else {
             match *self {
-                Var(x) => Dag::new(Var(x)),
+                Var(x) => dag!(Var(x)),
                 Fun(f, ref args) => {
-                    Dag::new(Fun(f, args.iter().map(|t| t.replace(to, from)).collect()))
+                    dag!(Fun(f, args.iter().map(|t| t.replace(to, from)).collect()))
                 }
             }
         }
@@ -38,8 +38,8 @@ impl Term {
 
     fn shift_indices(&self, shift: usize) -> Dag<Term> {
         match *self {
-            Var(x) => Dag::new(Var(x + shift)),
-            Fun(f, ref args) => Dag::new(Fun(
+            Var(x) => dag!(Var(x + shift)),
+            Fun(f, ref args) => dag!(Fun(
                 f,
                 args.iter().map(|t| t.shift_indices(shift)).collect(),
             )),
@@ -51,9 +51,9 @@ impl Term {
             Var(x) => if x == index {
                 i.shift_indices(index)
             } else {
-                Dag::new(Var(x))
+                dag!(Var(x))
             },
-            Fun(f, ref args) => Dag::new(Fun(
+            Fun(f, ref args) => dag!(Fun(
                 f,
                 args.iter().map(|t| t.instantiate(i, index)).collect(),
             )),
