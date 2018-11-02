@@ -1,7 +1,7 @@
 pub mod tptp;
 
-use goal::Goal;
-use options::{InputOptions, InputOptionsLanguage};
+use crate::goal::Goal;
+use crate::options::{InputOptions, InputOptionsLanguage};
 
 pub enum LoadError {
     OSError,

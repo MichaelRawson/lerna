@@ -1,11 +1,11 @@
 use std::vec::Vec;
-use types::Dag;
+use crate::types::Dag;
 
-use symbol::Symbol;
-use types::Set;
+use crate::symbol::Symbol;
+use crate::types::Set;
 
-use term::Term;
-use term::Term::*;
+use crate::term::Term;
+use crate::term::Term::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Formula {

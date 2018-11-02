@@ -1,4 +1,4 @@
-use goal::Goal;
+use crate::goal::Goal;
 
 fn simplify_step(goal: &Goal) -> Goal {
     goal.clone()

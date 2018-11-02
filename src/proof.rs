@@ -1,6 +1,6 @@
 use std::vec::Vec;
 
-use goal::Goal;
+use crate::goal::Goal;
 
 pub struct Proof {
     pub goal: Goal,

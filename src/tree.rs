@@ -1,16 +1,16 @@
 use std::vec::Vec;
-use types::Dag;
+use crate::types::Dag;
 
 use atomic::Atomic;
 use atomic::Ordering::Relaxed;
 use parking_lot::RwLock;
 
-use goal::Goal;
-use inferences::infer;
-use proof::Proof;
-use random::{equal_choice, weighted_choice};
-use simplifications::simplify;
-use types::Set;
+use crate::goal::Goal;
+use crate::inferences::infer;
+use crate::proof::Proof;
+use crate::random::{equal_choice, weighted_choice};
+use crate::simplifications::simplify;
+use crate::types::Set;
 
 pub fn uct(score: f64, parent_visits: usize, child_visits: usize) -> f64 {
     #[allow(non_snake_case)]
@@ -102,7 +102,7 @@ impl GoalNode {
 
         *children = infer(self.goal.clone())
             .into_iter()
-            .map(InferenceNode::new)
+            .map(|x| Box::new(InferenceNode::new(x)))
             .collect();
         self.atomic_expanded.store(true, Relaxed);
         true
@@ -152,7 +152,7 @@ struct InferenceNode {
 }
 
 impl InferenceNode {
-    fn new(subgoals: Set<Goal>) -> Box<Self> {
+    fn new(subgoals: Set<Goal>) -> Self {
         let node = InferenceNode {
             subgoals: subgoals.into_iter().map(GoalNode::leaf).collect(),
             atomic_visits: Atomic::new(1),
@@ -160,7 +160,7 @@ impl InferenceNode {
             atomic_complete: Atomic::new(false),
         };
         node.update();
-        Box::new(node)
+        node
     }
 
     fn visits(&self) -> usize {

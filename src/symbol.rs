@@ -2,7 +2,7 @@ use atomic::Atomic;
 use atomic::Ordering::Relaxed;
 use parking_lot::Mutex;
 
-use types::BiMap;
+use crate::types::BiMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Flavour {

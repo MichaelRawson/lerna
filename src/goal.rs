@@ -1,8 +1,8 @@
-use types::Dag;
+use crate::types::Dag;
 
-use formula::Formula;
-use symbol::Symbol;
-use types::Set;
+use crate::formula::Formula;
+use crate::symbol::Symbol;
+use crate::types::Set;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Goal {

@@ -1,12 +1,12 @@
 use std::cmp::{max, min};
-use types::Dag;
+use crate::types::Dag;
 
-use formula::Formula;
-use formula::Formula::*;
-use goal::Goal;
-use inferences::Inferred;
-use term::Term;
-use types::Set;
+use crate::formula::Formula;
+use crate::formula::Formula::*;
+use crate::goal::Goal;
+use crate::inferences::Inferred;
+use crate::term::Term;
+use crate::types::Set;
 
 fn contradiction() -> Inferred {
     set![Goal::new(set![dag!(F)])]

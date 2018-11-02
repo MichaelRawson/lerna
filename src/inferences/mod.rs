@@ -1,8 +1,8 @@
 mod complete;
 
-use goal::Goal;
-use simplifications::simplify;
-use types::Set;
+use crate::goal::Goal;
+use crate::simplifications::simplify;
+use crate::types::Set;
 
 pub type Inferred = Set<Goal>;
 

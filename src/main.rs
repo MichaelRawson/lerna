@@ -36,9 +36,9 @@ use std::process::exit;
 
 use time::get_time;
 
-use input::LoadError;
-use options::Options;
-use search::{Search, SearchResult};
+use crate::input::LoadError;
+use crate::options::Options;
+use crate::search::{Search, SearchResult};
 
 fn main() {
     let start_time = get_time();

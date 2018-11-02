@@ -1,16 +1,16 @@
-use types::Dag;
+use crate::types::Dag;
 
 use tptp;
 use tptp::error::*;
 use tptp::syntax::*;
 
-use formula::Formula;
-use goal::Goal;
-use input::LoadError;
-use symbol::{Flavour, Symbol};
-use term::Term;
-use term::Term::*;
-use types::{Map, Set};
+use crate::formula::Formula;
+use crate::goal::Goal;
+use crate::input::LoadError;
+use crate::symbol::{Flavour, Symbol};
+use crate::term::Term;
+use crate::term::Term::*;
+use crate::types::{Map, Set};
 
 fn load_fof_name(name: Name) -> String {
     match name {

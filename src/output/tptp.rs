@@ -1,5 +1,5 @@
 use std::fmt::Arguments;
-use types::Dag;
+use crate::types::Dag;
 
 use fern::FormatCallback;
 use log::Record;
@@ -7,13 +7,13 @@ use tptp::syntax;
 use tptp::syntax::FofFormula::*;
 use tptp::syntax::FofTerm::*;
 
-use formula::Formula;
-use formula::Formula::*;
-use proof::Proof;
-use symbol::Flavour;
-use term::Term;
-use term::Term::*;
-use types::Set;
+use crate::formula::Formula;
+use crate::formula::Formula::*;
+use crate::proof::Proof;
+use crate::symbol::Flavour;
+use crate::term::Term;
+use crate::term::Term::*;
+use crate::types::Set;
 
 fn to_tptp_bound(bound: usize) -> String {
     format!("X{}", bound)

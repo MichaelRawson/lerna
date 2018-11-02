@@ -1,6 +1,7 @@
 [package]
 name = "lerna"
 version = "0.1.0"
+edition = "2018"
 authors = ["Michael Rawson <michael@rawsons.uk>"]
 description = "proves theorems"
 
@@ -15,5 +16,5 @@ log = "0.4"
 num_cpus = "1.8"
 parking_lot = "0.6"
 time = "0.1"
-tptp = "0.5"
+tptp = "0.6"
 rand = "0.5"

@@ -1,7 +1,7 @@
 use rand::distributions::{Distribution, Uniform};
 use rand::{thread_rng, Rng};
 
-use score::Score;
+use crate::score::Score;
 
 pub fn equal_choice<T>(items: &[T]) -> Option<&T> {
     let mut rng = thread_rng();

@@ -2,10 +2,10 @@ use crossbeam::scope;
 use num_cpus;
 use time::{get_time, Duration, Timespec};
 
-use goal::Goal;
-use options::SearchOptions;
-use proof::Proof;
-use tree::Tree;
+use crate::goal::Goal;
+use crate::options::SearchOptions;
+use crate::proof::Proof;
+use crate::tree::Tree;
 
 const STACK_SIZE: usize = 10 * 1024 * 1024;
 

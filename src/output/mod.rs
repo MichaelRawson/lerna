@@ -1,15 +1,15 @@
 mod tptp;
 
 use std::io::stdout;
-use types::Dag;
+use crate::types::Dag;
 
 use fern::Dispatch;
 use log::LevelFilter::{Info, Trace, Warn};
 
-use formula::Formula;
-use options::{OutputOptions, OutputOptionsLanguage, OutputOptionsLoggingLevel};
-use proof::Proof;
-use types::Set;
+use crate::formula::Formula;
+use crate::options::{OutputOptions, OutputOptionsLanguage, OutputOptionsLoggingLevel};
+use crate::proof::Proof;
+use crate::types::Set;
 
 pub fn os_error(options: &OutputOptions) {
     match options.language {
