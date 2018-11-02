@@ -1,5 +1,5 @@
-use std::vec::Vec;
 use crate::types::Dag;
+use std::vec::Vec;
 
 use crate::symbol::Symbol;
 use crate::types::Set;
@@ -48,11 +48,13 @@ impl Term {
 
     pub fn instantiate(&self, i: &Dag<Term>, index: usize) -> Dag<Term> {
         match *self {
-            Var(x) => if x == index {
-                i.shift_indices(index)
-            } else {
-                dag!(Var(x))
-            },
+            Var(x) => {
+                if x == index {
+                    i.shift_indices(index)
+                } else {
+                    dag!(Var(x))
+                }
+            }
             Fun(f, ref args) => dag!(Fun(
                 f,
                 args.iter().map(|t| t.instantiate(i, index)).collect(),

@@ -1,5 +1,5 @@
-use std::vec::Vec;
 use crate::types::Dag;
+use std::vec::Vec;
 
 use crate::symbol::Symbol;
 use crate::types::Set;
@@ -47,12 +47,8 @@ impl Formula {
         match *self {
             T => dag!(T),
             F => dag!(F),
-            Eql(ref left, ref right) => {
-                dag!(Eql(left.replace(to, from), right.replace(to, from)))
-            }
-            Prd(p, ref args) => {
-                dag!(Prd(p, args.iter().map(|t| t.replace(to, from)).collect()))
-            }
+            Eql(ref left, ref right) => dag!(Eql(left.replace(to, from), right.replace(to, from))),
+            Prd(p, ref args) => dag!(Prd(p, args.iter().map(|t| t.replace(to, from)).collect())),
             Not(ref p) => dag!(Not(p.replace(to, from))),
             Imp(ref p, ref q) => dag!(Imp(p.replace(to, from), q.replace(to, from))),
             Eqv(ref p, ref q) => dag!(Eqv(p.replace(to, from), q.replace(to, from))),

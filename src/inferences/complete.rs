@@ -1,5 +1,5 @@
-use std::cmp::{max, min};
 use crate::types::Dag;
+use std::cmp::{max, min};
 
 use crate::formula::Formula;
 use crate::formula::Formula::*;

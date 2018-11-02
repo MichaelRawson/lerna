@@ -1,7 +1,7 @@
 mod tptp;
 
-use std::io::stdout;
 use crate::types::Dag;
+use std::io::stdout;
 
 use fern::Dispatch;
 use log::LevelFilter::{Info, Trace, Warn};
@@ -51,7 +51,8 @@ pub fn setup_logging(options: &OutputOptions) {
     Dispatch::new()
         .format(match options.language {
             OutputOptionsLanguage::TPTP => tptp::format_log,
-        }).level(global_level)
+        })
+        .level(global_level)
         .chain(stdout())
         .apply()
         .expect("logging configuration failed");

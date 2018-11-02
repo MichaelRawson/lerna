@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 pub type Dag<T> = Arc<T>;
 macro_rules! dag {
-    ($x:expr) => {Dag::new($x)}
+    ($x:expr) => {
+        Dag::new($x)
+    };
 }
 
 pub type Set<T> = im::OrdSet<T>;

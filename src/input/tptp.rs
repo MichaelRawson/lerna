@@ -95,9 +95,7 @@ fn load_fof_formula(
                 FofNonAssocConnective::NotEquivalent => {
                     Formula::Not(dag!(Formula::Eqv(left, right)))
                 }
-                FofNonAssocConnective::NotOr => {
-                    Formula::Not(dag!(Formula::Or(set![left, right])))
-                }
+                FofNonAssocConnective::NotOr => Formula::Not(dag!(Formula::Or(set![left, right]))),
                 FofNonAssocConnective::NotAnd => {
                     Formula::Not(dag!(Formula::And(set![left, right])))
                 }

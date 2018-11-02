@@ -1,5 +1,5 @@
-use std::vec::Vec;
 use crate::types::Dag;
+use std::vec::Vec;
 
 use atomic::Atomic;
 use atomic::Ordering::Relaxed;

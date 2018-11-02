@@ -101,7 +101,8 @@ impl Options {
                     .help("load problem from this file")
                     .required(true)
                     .index(1),
-            ).arg(
+            )
+            .arg(
                 Arg::with_name("timeout")
                     .long("timeout")
                     .short("t")
@@ -109,7 +110,8 @@ impl Options {
                     .value_name("SECS")
                     .validator(|x| validate_seconds(&x))
                     .default_value("30"),
-            ).arg(
+            )
+            .arg(
                 Arg::with_name("logging")
                     .long("logging")
                     .takes_value(true)
@@ -118,7 +120,8 @@ impl Options {
                     .possible_value("normal")
                     .possible_value("verbose")
                     .default_value("normal"),
-            ).get_matches();
+            )
+            .get_matches();
 
         let input = InputOptions::new(&matches);
         let output = OutputOptions::new(&matches);

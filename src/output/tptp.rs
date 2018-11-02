@@ -1,5 +1,5 @@
-use std::fmt::Arguments;
 use crate::types::Dag;
+use std::fmt::Arguments;
 
 use fern::FormatCallback;
 use log::Record;

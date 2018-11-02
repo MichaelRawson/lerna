@@ -15,7 +15,8 @@ pub fn weighted_choice(scores: &[f64]) -> usize {
         .scan(0.0, |running, x| {
             *running += x;
             Some(*running)
-        }).map(Score::new)
+        })
+        .map(Score::new)
         .collect();
 
     let mut rng = thread_rng();
