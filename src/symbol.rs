@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 
 use crate::types::BiMap;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Flavour {
     Functor,
     Distinct,
@@ -15,7 +15,7 @@ lazy_static! {
     static ref SYMBOLS: Mutex<BiMap<(String, usize, Flavour), Symbol>> = Mutex::new(BiMap::new());
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Symbol(usize);
 
 impl Symbol {

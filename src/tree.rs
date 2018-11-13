@@ -1,4 +1,4 @@
-use crate::types::Dag;
+use std::sync::Arc;
 use std::vec::Vec;
 
 use atomic::Atomic;
@@ -30,11 +30,11 @@ struct GoalNode {
 }
 
 impl GoalNode {
-    fn leaf(goal: Goal) -> Dag<Self> {
+    fn leaf(goal: Goal) -> Arc<Self> {
         let complete = goal.complete();
         let distance = if complete { 0 } else { 1 };
 
-        dag!(GoalNode {
+        Arc::new(GoalNode {
             goal,
             children: RwLock::new(vec![]),
             atomic_expanded: Atomic::new(false),
@@ -72,7 +72,7 @@ impl GoalNode {
         should_update
     }
 
-    fn select(&self) -> Option<Dag<Self>> {
+    fn select(&self) -> Option<Arc<Self>> {
         if !self.expanded() {
             return None;
         }
@@ -145,7 +145,7 @@ impl GoalNode {
 
 #[derive(Debug)]
 struct InferenceNode {
-    subgoals: Vec<Dag<GoalNode>>,
+    subgoals: Vec<Arc<GoalNode>>,
     atomic_visits: Atomic<usize>,
     atomic_distance: Atomic<u16>,
     atomic_complete: Atomic<bool>,
@@ -183,13 +183,14 @@ impl InferenceNode {
         uct(score, parent_visits + 1, child_visits)
     }
 
-    fn select(&self) -> Option<Dag<GoalNode>> {
-        let available: Vec<&Dag<GoalNode>> = self
+    fn select(&self) -> Option<Arc<GoalNode>> {
+        let available: Vec<Arc<GoalNode>> = self
             .subgoals
             .iter()
             .filter(|goal| !goal.complete())
+            .cloned()
             .collect();
-        equal_choice(&available).map(|x| (*x).clone())
+        equal_choice(&available).cloned()
     }
 
     fn update(&self) {
@@ -212,7 +213,7 @@ impl InferenceNode {
 }
 
 pub struct Tree {
-    root: Dag<GoalNode>,
+    root: Arc<GoalNode>,
 }
 
 impl Tree {

@@ -1,22 +1,22 @@
-use crate::types::Dag;
-
 use crate::formula::Formula;
 use crate::symbol::Symbol;
 use crate::types::Set;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+use unique::Uniq;
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Goal {
-    refute: Set<Dag<Formula>>,
+    refute: Set<Uniq<Formula>>,
     symbols: Set<Symbol>,
 }
 
 impl Goal {
-    pub fn new(refute: Set<Dag<Formula>>) -> Self {
+    pub fn new(refute: Set<Uniq<Formula>>) -> Self {
         let symbols = Set::unions(refute.iter().map(|f| f.symbols()));
         Goal { refute, symbols }
     }
 
-    pub fn with(&self, f: Dag<Formula>) -> Self {
+    pub fn with(&self, f: Uniq<Formula>) -> Self {
         if self.refute.contains(&f) {
             self.clone()
         } else {
@@ -27,7 +27,7 @@ impl Goal {
         }
     }
 
-    pub fn with_many(&self, formulae: Set<Dag<Formula>>) -> Self {
+    pub fn with_many(&self, formulae: Set<Uniq<Formula>>) -> Self {
         formulae
             .into_iter()
             .fold(self.clone(), |goal, f| goal.with(f))
@@ -41,7 +41,7 @@ impl Goal {
         self.refute.contains(&Formula::F)
     }
 
-    pub fn formulae(&self) -> impl Iterator<Item = &Dag<Formula>> {
+    pub fn formulae(&self) -> impl Iterator<Item = &Uniq<Formula>> {
         self.refute.iter()
     }
 
@@ -49,7 +49,7 @@ impl Goal {
         self.symbols.iter()
     }
 
-    pub fn refutation(self) -> Set<Dag<Formula>> {
+    pub fn refutation(self) -> Set<Uniq<Formula>> {
         self.refute
     }
 }

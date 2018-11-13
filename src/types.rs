@@ -1,19 +1,13 @@
 use im;
 
-use std::collections::BTreeMap;
-use std::sync::Arc;
-
-pub type Dag<T> = Arc<T>;
-macro_rules! dag {
-    ($x:expr) => {
-        Dag::new($x)
-    };
-}
+use std::collections::HashMap;
+use std::hash::Hash;
 
 pub type Set<T> = im::OrdSet<T>;
 macro_rules! set {
     [$($x:tt)*] => {ordset![$($x)*]}
 }
+
 pub type Map<K, V> = im::OrdMap<K, V>;
 macro_rules! map {
     [$($x:tt)*] => {ordmap![$($x)*]}
@@ -21,22 +15,22 @@ macro_rules! map {
 
 pub struct BiMap<A, B>
 where
-    A: Clone + Ord,
-    B: Clone + Ord,
+    A: Clone + Eq + Hash,
+    B: Clone + Eq + Hash,
 {
-    forward: BTreeMap<A, B>,
-    back: BTreeMap<B, A>,
+    forward: HashMap<A, B>,
+    back: HashMap<B, A>,
 }
 
 impl<A, B> BiMap<A, B>
 where
-    A: Clone + Ord,
-    B: Clone + Ord,
+    A: Clone + Eq + Hash,
+    B: Clone + Eq + Hash,
 {
     pub fn new() -> Self {
         BiMap {
-            forward: BTreeMap::new(),
-            back: BTreeMap::new(),
+            forward: HashMap::new(),
+            back: HashMap::new(),
         }
     }
 

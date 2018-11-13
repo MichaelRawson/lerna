@@ -13,6 +13,7 @@ extern crate parking_lot;
 extern crate rand;
 extern crate time;
 extern crate tptp;
+extern crate unique;
 
 #[macro_use]
 mod types;

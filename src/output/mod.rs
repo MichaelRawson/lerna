@@ -1,10 +1,10 @@
 mod tptp;
 
-use crate::types::Dag;
 use std::io::stdout;
 
 use fern::Dispatch;
 use log::LevelFilter::{Info, Trace, Warn};
+use unique::Uniq;
 
 use crate::formula::Formula;
 use crate::options::{OutputOptions, OutputOptionsLanguage, OutputOptionsLoggingLevel};
@@ -29,7 +29,7 @@ pub fn unsupported(options: &OutputOptions) {
     }
 }
 
-pub fn proof_found(options: &OutputOptions, original: &Set<Dag<Formula>>, proof: Proof) {
+pub fn proof_found(options: &OutputOptions, original: &Set<Uniq<Formula>>, proof: Proof) {
     match options.language {
         OutputOptionsLanguage::TPTP => tptp::szs_refutation(&options.name, original, proof),
     }
