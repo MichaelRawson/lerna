@@ -33,8 +33,8 @@ impl Goal {
             .fold(self.clone(), |goal, f| goal.with(f))
     }
 
-    pub fn contains(&self, f: &Formula) -> bool {
-        self.refute.contains(f)
+    pub fn contains(&self, f: Uniq<Formula>) -> bool {
+        self.refute.contains(&f)
     }
 
     pub fn complete(&self) -> bool {

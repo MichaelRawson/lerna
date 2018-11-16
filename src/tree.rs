@@ -32,8 +32,7 @@ struct GoalNode {
 impl GoalNode {
     fn leaf(goal: Goal) -> Arc<Self> {
         let complete = goal.complete();
-        let distance = if complete { 0 } else { 1 };
-
+        let distance = 1;//if complete { 0 } else { 1 };
         Arc::new(GoalNode {
             goal,
             children: RwLock::new(vec![]),

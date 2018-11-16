@@ -25,7 +25,7 @@ fn equality(goal: &Goal, left: Uniq<Term>, right: Uniq<Term>) -> Inferred {
 }
 
 fn negated(goal: &Goal, p: Uniq<Formula>) -> Set<Inferred> {
-    if goal.contains(&p) {
+    if goal.contains(p) {
         return set![contradiction()];
     }
 
