@@ -35,7 +35,7 @@ impl Term {
         }
     }
 
-    pub fn replace(term: Uniq<Term>, to: Uniq<Term>, from: Uniq<Term>) -> Uniq<Term> {
+    pub fn replace(term: Uniq<Self>, to: Uniq<Self>, from: Uniq<Self>) -> Uniq<Self> {
         if term == to {
             return from
         }
@@ -43,28 +43,28 @@ impl Term {
         match *term {
             Var(_) => term,
             Fun(f, ref args) => {
-                Uniq::new(Fun(f, args.iter().map(|t| Term::replace(*t, to, from)).collect()))
+                Uniq::new(Fun(f, args.iter().map(|t| Self::replace(*t, to, from)).collect()))
             }
         }
     }
 
-    fn shift_indices(&self, shift: usize) -> Uniq<Term> {
-        match *self {
+    fn shift_indices(term: Uniq<Self>, shift: usize) -> Uniq<Self> {
+        match *term {
             Var(x) => Uniq::new(Var(x + shift)),
             Fun(f, ref args) => Uniq::new(Fun(
                 f,
-                args.iter().map(|t| t.shift_indices(shift)).collect(),
+                args.iter().map(|t| Self::shift_indices(*t, shift)).collect(),
             )),
         }
     }
 
-    pub fn instantiate(term: Uniq<Term>, i: Uniq<Term>, index: usize) -> Uniq<Term> {
+    pub fn instantiate(term: Uniq<Self>, i: Uniq<Self>, index: usize) -> Uniq<Self> {
         match *term {
-            Var(x) if x == index => i.shift_indices(index),
+            Var(x) if x == index => Self::shift_indices(i, index),
             Var(_) => term,
             Fun(f, ref args) => Uniq::new(Fun(
                 f,
-                args.iter().map(|t| Term::instantiate(*t, i, index)).collect(),
+                args.iter().map(|t| Self::instantiate(*t, i, index)).collect(),
             )),
         }
     }
