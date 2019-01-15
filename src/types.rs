@@ -1,16 +1,22 @@
 use im;
+use smallvec;
 
 use std::collections::HashMap;
 use std::hash::Hash;
 
-pub type Set<T> = im::OrdSet<T>;
-macro_rules! set {
-    [$($x:tt)*] => {ordset![$($x)*]}
+pub type List<T> = smallvec::SmallVec<[T; 8]>;
+macro_rules! list {
+    [$($x:tt)*] => {(smallvec![$($x)*]::<List<_>>)}
 }
 
-pub type Map<K, V> = im::OrdMap<K, V>;
+pub type Set<T> = im::HashSet<T>;
+macro_rules! set {
+    [$($x:tt)*] => {hashset![$($x)*]}
+}
+
+pub type Map<K, V> = im::HashMap<K, V>;
 macro_rules! map {
-    [$($x:tt)*] => {ordmap![$($x)*]}
+    [$($x:tt)*] => {hashmap![$($x)*]}
 }
 
 pub struct BiMap<A, B>

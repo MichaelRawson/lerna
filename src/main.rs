@@ -11,8 +11,11 @@ extern crate log;
 extern crate num_cpus;
 extern crate parking_lot;
 extern crate rand;
+#[macro_use]
+extern crate smallvec;
 extern crate time;
 extern crate tptp;
+#[macro_use]
 extern crate unique;
 
 #[macro_use]

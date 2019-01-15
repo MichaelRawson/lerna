@@ -15,10 +15,11 @@ lazy_static = "1.1"
 log = "0.4"
 num_cpus = "1.8"
 parking_lot = "0.6"
+smallvec = "0.6"
 time = "0.1"
 tptp = "0.6"
 rand = "0.5"
-unique = "0.1"
+unique = "0.2"
 
 [profile.release]
 panic = "abort"

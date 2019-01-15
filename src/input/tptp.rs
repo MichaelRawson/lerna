@@ -3,11 +3,11 @@ use tptp::error::*;
 use tptp::syntax::*;
 use unique::Uniq;
 
-use crate::formula::Formula;
+use crate::formula::{Formula, FormulaSet};
 use crate::goal::Goal;
 use crate::input::LoadError;
 use crate::symbol::{Flavour, Symbol};
-use crate::term::Term;
+use crate::term::{Term, TermList};
 use crate::term::Term::*;
 use crate::types::{Map, Set};
 
@@ -25,7 +25,7 @@ fn load_fof_term(
 ) -> Result<Uniq<Term>, LoadError> {
     match term {
         FofTerm::Variable(x) => match bound.get(&x) {
-            Some(x) => Ok(Uniq::new(Var(bound_depth - 1 - x))),
+            Some(x) => Ok(uniq!(Var(bound_depth - 1 - x))),
             None => {
                 error!("unbound variable: {}", x);
                 Err(LoadError::InputError)
@@ -36,15 +36,15 @@ fn load_fof_term(
             let arity = fof_args.len();
             let symbol = Symbol::get(name, arity, Flavour::Functor);
 
-            let mut args = vec![];
+            let mut args = list![];
             for arg in fof_args {
                 args.push(load_fof_term(&bound, bound_depth, *arg)?);
             }
-            Ok(Uniq::new(Fun(symbol, args)))
+            Ok(uniq!(Fun(symbol, uniq!(TermList(args)))))
         }
         FofTerm::DistinctObject(name) => {
             let symbol = Symbol::get(name, 0, Flavour::Distinct);
-            Ok(Uniq::new(Fun(symbol, vec![])))
+            Ok(uniq!(Fun(symbol, uniq!(TermList(list![])))))
         }
     }
 }
@@ -55,16 +55,16 @@ fn load_fof_formula(
     formula: FofFormula,
 ) -> Result<Uniq<Formula>, LoadError> {
     Ok(match formula {
-        FofFormula::Boolean(b) => Uniq::new(if b { Formula::T } else { Formula::F }),
+        FofFormula::Boolean(b) => if b { Formula::t() } else { Formula::f() },
         FofFormula::Infix(op, x, y) => {
-            let equality = Uniq::new(Formula::Eql(
+            let equality = Formula::eql(
                 load_fof_term(&bound, bound_depth, *x)?,
                 load_fof_term(&bound, bound_depth, *y)?,
-            ));
+            );
             use self::InfixEquality::*;
             match op {
                 Equal => equality,
-                NotEqual => Formula::negate(equality),
+                NotEqual => Formula::not(equality),
             }
         }
         FofFormula::Predicate(name, fof_args) => {
@@ -72,31 +72,31 @@ fn load_fof_formula(
             let arity = fof_args.len();
             let symbol = Symbol::get(name, arity, Flavour::Functor);
 
-            let mut args = vec![];
+            let mut args = list![];
             for arg in fof_args {
                 args.push(load_fof_term(&bound, bound_depth, *arg)?);
             }
-            Uniq::new(Formula::Prd(symbol, args))
+            Formula::prd(symbol, args.into_iter())
         }
         FofFormula::Unary(op, f) => {
             let f = load_fof_formula(bound.clone(), bound_depth, *f)?;
-            Uniq::new(match op {
+            uniq!(match op {
                 FofUnaryConnective::Not => Formula::Not(f),
             })
         }
         FofFormula::NonAssoc(op, left, right) => {
             let left = load_fof_formula(bound.clone(), bound_depth, *left)?;
             let right = load_fof_formula(bound.clone(), bound_depth, *right)?;
-            Uniq::new(match op {
+            uniq!(match op {
                 FofNonAssocConnective::LRImplies => Formula::Imp(left, right),
                 FofNonAssocConnective::RLImplies => Formula::Imp(right, left),
                 FofNonAssocConnective::Equivalent => Formula::Eqv(left, right),
                 FofNonAssocConnective::NotEquivalent => {
-                    Formula::Not(Uniq::new(Formula::Eqv(left, right)))
+                    Formula::Not(uniq!(Formula::Eqv(left, right)))
                 }
-                FofNonAssocConnective::NotOr => Formula::Not(Uniq::new(Formula::Or(set![left, right]))),
+                FofNonAssocConnective::NotOr => Formula::Not(uniq!(Formula::Or(uniq!(FormulaSet(set![left, right]))))),
                 FofNonAssocConnective::NotAnd => {
-                    Formula::Not(Uniq::new(Formula::And(set![left, right])))
+                    Formula::Not(uniq!(Formula::And(uniq!(FormulaSet(set![left, right])))))
                 }
             })
         }
@@ -105,7 +105,8 @@ fn load_fof_formula(
             for arg in fof_args {
                 args.insert(load_fof_formula(bound.clone(), bound_depth, *arg)?);
             }
-            Uniq::new(match op {
+            let args = uniq!(FormulaSet(args));
+            uniq!(match op {
                 FofAssocConnective::And => Formula::And(args),
                 FofAssocConnective::Or => Formula::Or(args),
             })
@@ -125,7 +126,7 @@ fn load_fof_formula(
 
             let mut f = load_fof_formula(bound, depth, *f)?;
             for _ in 0..num_bound {
-                f = Uniq::new(quantifier(f));
+                f = uniq!(quantifier(f));
             }
             f
         }
@@ -153,7 +154,7 @@ fn load_fof(role: FormulaRole, formula: FofFormula) -> Result<Uniq<Formula>, Loa
     let bound = map![];
     let formula = load_fof_formula(bound, 0, formula)?;
     if should_negate(role)? {
-        Ok(Formula::negate(formula))
+        Ok(Formula::not(formula))
     } else {
         Ok(formula)
     }

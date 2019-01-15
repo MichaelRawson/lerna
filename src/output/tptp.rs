@@ -7,7 +7,7 @@ use tptp::syntax::FofFormula::*;
 use tptp::syntax::FofTerm::*;
 use unique::Uniq;
 
-use crate::formula::Formula;
+use crate::formula::{Formula, FormulaSet};
 use crate::formula::Formula::*;
 use crate::proof::Proof;
 use crate::symbol::Flavour;
@@ -51,11 +51,11 @@ fn to_tptp_formula(f: Uniq<Formula>, bound_depth: usize) -> Box<syntax::FofFormu
             syntax::FofUnaryConnective::Not,
             to_tptp_formula(p, bound_depth),
         ),
-        And(ref ps) => {
+        And(ps) => {
             let ps = ps.iter().map(|p| to_tptp_formula(*p, bound_depth)).collect();
             Assoc(syntax::FofAssocConnective::And, ps)
         }
-        Or(ref ps) => {
+        Or(ps) => {
             let ps = ps.iter().map(|p| to_tptp_formula(*p, bound_depth)).collect();
             Assoc(syntax::FofAssocConnective::Or, ps)
         }
@@ -98,7 +98,7 @@ fn print_refutation(start: &Set<Uniq<Formula>>, proof: Proof, mut index: usize) 
         .collect();
 
     if !fresh.is_empty() {
-        let conjunction = Uniq::new(Formula::And(fresh));
+        let conjunction = uniq!(Formula::And(uniq!(FormulaSet(fresh))));
         let statement = to_tptp_statement(index, conjunction);
         println!("{}", statement);
         index += 1;
