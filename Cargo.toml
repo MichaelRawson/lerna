@@ -1,25 +1,17 @@
 [package]
 name = "lerna"
-version = "0.1.0"
-edition = "2018"
+version = "0.2.0"
 authors = ["Michael Rawson <michael@rawsons.uk>"]
-description = "proves theorems"
+description = "an intelligent theorem prover"
+edition = "2018"
 
 [dependencies]
-atomic = "0.4"
+chashmap = "2.2"
+crossbeam = "0.7"
 clap = "2.32"
-crossbeam = "0.4"
-fern = "0.5"
-im = "12.0"
-lazy_static = "1.1"
+lazy_static = "1.2"
 log = "0.4"
-num_cpus = "1.8"
-parking_lot = "0.6"
-smallvec = "0.6"
-time = "0.1"
-tptp = "0.6"
-rand = "0.5"
-unique = "0.2"
-
-[profile.release]
-panic = "abort"
+memmap = "0.7"
+fern = "0.5"
+tptp = "0.7"
+unique = "0.5"

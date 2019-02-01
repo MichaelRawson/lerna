@@ -1,52 +1,20 @@
-use atomic::Atomic;
-use atomic::Ordering::Relaxed;
-use parking_lot::Mutex;
+use lazy_static::lazy_static;
+use std::fmt;
+use unique::allocators::HashAllocator;
+use unique::{make_allocator, Allocated};
 
-use crate::types::BiMap;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Flavour {
-    Functor,
-    Distinct,
+#[derive(PartialEq, Eq, Hash)]
+pub enum Symbol {
+    Original(String),
 }
 
-lazy_static! {
-    static ref FRESH: Atomic<usize> = Atomic::new(0);
-    static ref SYMBOLS: Mutex<BiMap<(String, usize, Flavour), Symbol>> = Mutex::new(BiMap::new());
-}
+make_allocator!(Symbol, __SYMBOL_ALLOC, HashAllocator);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Symbol(usize);
-
-impl Symbol {
-    pub fn get(name: String, arity: usize, flavour: Flavour) -> Self {
-        let mut symbols = SYMBOLS.lock();
-        let entry = (name, arity, flavour);
-
-        if let Some(symbol) = symbols.forward(&entry) {
-            return *symbol;
+impl fmt::Debug for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Symbol::*;
+        match self {
+            Original(s) => write!(f, "{}", s),
         }
-
-        let symbol = Symbol(symbols.len());
-        symbols.insert(&entry, &symbol);
-        symbol
-    }
-
-    pub fn fresh(arity: usize) -> Self {
-        let fresh = FRESH.fetch_add(1, Relaxed);
-        let name = format!("_k{}", fresh);
-        Symbol::get(name, arity, Flavour::Functor)
-    }
-
-    pub fn name(self) -> String {
-        SYMBOLS.lock().back(&self).unwrap().0.clone()
-    }
-
-    pub fn arity(self) -> usize {
-        SYMBOLS.lock().back(&self).unwrap().1
-    }
-
-    pub fn flavour(self) -> Flavour {
-        SYMBOLS.lock().back(&self).unwrap().2
     }
 }

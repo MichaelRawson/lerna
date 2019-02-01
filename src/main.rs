@@ -1,86 +1,32 @@
-extern crate atomic;
-extern crate clap;
-extern crate crossbeam;
-extern crate fern;
 #[macro_use]
-extern crate im;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-extern crate num_cpus;
-extern crate parking_lot;
-extern crate rand;
-#[macro_use]
-extern crate smallvec;
-extern crate time;
-extern crate tptp;
-#[macro_use]
-extern crate unique;
+mod set;
 
-#[macro_use]
-mod types;
-
+mod deduction;
 mod formula;
 mod goal;
-mod inferences;
+mod heuristic;
+mod inference;
 mod input;
+mod logging;
 mod options;
-mod output;
-mod proof;
-mod random;
+mod prover;
 mod score;
 mod search;
-mod simplifications;
+mod simplification;
 mod symbol;
-mod term;
-mod tree;
-
-use std::process::exit;
-
-use time::get_time;
-
-use crate::input::LoadError;
-use crate::options::Options;
-use crate::search::{Search, SearchResult};
+mod system;
 
 fn main() {
-    let start_time = get_time();
+    logging::initialise();
+    options::parse();
+    options::OPTIONS.check_time();
 
-    let options = Options::parse();
-    output::setup_logging(&options.output);
-
-    debug!("program started, start time was {:?}", start_time);
-    info!("OK, running for {}s", &options.search.timeout);
-    info!("loading from {:?}...", options.input.file);
-    let goal = input::load(&options.input).unwrap_or_else(|err| {
-        match err {
-            LoadError::OSError => output::os_error(&options.output),
-            LoadError::InputError => output::input_error(&options.output),
-            LoadError::Unsupported => output::unsupported(&options.output),
-        };
-        debug!("load error, exit(1)");
-        exit(1);
-    });
-    info!("loading complete");
-
-    let search = Search::new(&options.search, start_time, &goal);
-    info!("begin proving...");
-    match search.run() {
-        SearchResult::TimeOut => {
-            info!("...timed out");
-            debug!("time out, reporting...");
-            output::time_out(&options.output);
-            debug!("...proof failed, exit(1)");
-            exit(1)
-        }
-        SearchResult::ProofFound(proof) => {
-            info!("...proof found");
-            output::proof_found(&options.output, &goal.refutation(), proof);
-        }
+    let loaded = input::load();
+    let prover = prover::Prover::new(loaded.axioms, loaded.negated_conjecture);
+    if prover.run() {
+        println!("% SZS Status THM");
     }
-
-    info!("bye!");
-    debug!("all good, exit(0)");
-    exit(0)
+    else {
+        system::give_up()
+    };
 }
