@@ -1,32 +1,39 @@
 #[macro_use]
-mod set;
+mod collections;
 
 mod deduction;
 mod formula;
 mod goal;
-mod heuristic;
+//mod heuristic;
 mod inference;
 mod input;
+mod justification;
 mod logging;
 mod options;
-mod prover;
+//mod prover;
 mod score;
 mod search;
 mod simplification;
 mod symbol;
 mod system;
 
+//use crate::prover::Prover;
+
 fn main() {
-    logging::initialise();
-    options::parse();
-    options::OPTIONS.check_time();
+    options::initialize();
+    logging::initialize();
+    system::check_for_timeout();
 
     let loaded = input::load();
-    let prover = prover::Prover::new(loaded.axioms, loaded.negated_conjecture);
-    if prover.run() {
+    system::check_for_timeout();
+
+    /*
+    let result = Prover::new(loaded.axioms, loaded.negated_conjecture).run();
+    
+    if result.success {
         println!("% SZS Status THM");
-    }
-    else {
-        system::give_up()
+    } else {
+        system::time_out()
     };
+    */
 }

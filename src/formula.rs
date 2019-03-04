@@ -1,9 +1,9 @@
 use lazy_static::lazy_static;
 use std::fmt;
 use unique::allocators::HashAllocator;
-use unique::{make_allocator, Allocated, Id};
+use unique::{make_allocator, Id};
 
-use crate::set::Set;
+use crate::collections::Set;
 use crate::symbol::Symbol;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -12,18 +12,26 @@ pub enum Formula {
     F,
     Prd(Id<Symbol>),
     Not(Id<Formula>),
-    Or(Id<Set<Formula>>),
-    And(Id<Set<Formula>>),
+    Or(Set<Formula>),
+    And(Set<Formula>),
     Imp(Id<Formula>, Id<Formula>),
     Eqv(Id<Formula>, Id<Formula>),
 }
+make_allocator!(Formula, FORMULA_ALLOC, HashAllocator);
+use self::Formula::*;
 
-make_allocator!(Formula, __FORMULA_ALLOC, HashAllocator);
-make_allocator!(Set<Formula>, __FORMULA_SET_ALLOC, HashAllocator);
+lazy_static! {
+    pub static ref FALSE: Id<Formula> = Id::new(F);
+}
+
+impl Formula {
+    pub fn negate(formula: &Id<Formula>) -> Id<Formula> {
+        Id::new(Not(formula.clone()))
+    }
+}
 
 impl fmt::Debug for Formula {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Formula::*;
         match self {
             T => write!(f, "T"),
             F => write!(f, "F"),

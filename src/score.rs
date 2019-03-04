@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::fmt;
-use std::iter::Sum;
 
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Score(pub f32);
@@ -29,15 +28,5 @@ impl Ord for Score {
 impl fmt::Debug for Score {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt(f)
-    }
-}
-
-impl Sum for Score {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        let mut total = 0.0;
-        for s in iter {
-            total += s.0;
-        }
-        Score::new(total)
     }
 }

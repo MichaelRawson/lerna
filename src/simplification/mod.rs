@@ -1,35 +1,50 @@
 pub mod contradiction;
 
-use crate::goal::Goal;
+use unique::Id;
+
+use crate::collections::{list, List};
+use crate::goal::{Goal, GoalInfo};
 use crate::inference::Inference;
+use crate::justification::Justification;
 use crate::options::OPTIONS;
 
-pub struct SimplificationInfo;
+pub type Simplified = (Justification, Inference);
 
-impl SimplificationInfo {
-    pub fn new(_goal: &Goal) -> Self {
-        SimplificationInfo
-    }
+pub trait Simplification: Send + Sync {
+    fn simplify(&self, goal: &Id<Goal>, info: &GoalInfo) -> Option<Simplified>;
 }
 
-pub trait Simplification: Sync {
-    fn simplify(&self, goal: &Goal, info: &SimplificationInfo) -> Option<Inference>;
-}
+pub fn simplify(
+    goal: &Id<Goal>,
+    info: &GoalInfo,
+) -> (Id<Goal>, List<Justification>) {
+    let mut goal = goal.clone();
+    let mut log = list![];
+    let mut fresh = true;
 
-fn simplify_goal_pass(start: Goal, info: &SimplificationInfo) -> Goal {
-    OPTIONS.simplifications.iter().fold(start, |g, s| {
-        s.simplify(&g, info).map(|i| g.apply(&i)).unwrap_or(g)
-    })
-}
-
-pub fn simplify_goal(mut original: Goal) -> Goal {
-    let info = SimplificationInfo::new(&original);
-
-    loop {
-        let simplified = simplify_goal_pass(original.clone(), &info);
-        if simplified == original {
-            return original;
+    while fresh {
+        fresh = false;
+        for s in &OPTIONS.simplifications {
+            if let Some((justification, inference)) = s.simplify(&goal, info) {
+                let new = Goal::apply(&goal, &inference);
+                fresh |= new != goal;
+                goal = new;
+                log.push(justification);
+            }
         }
-        original = simplified;
     }
+
+    (goal, log)
+}
+
+mod prelude {
+    pub use smallvec::smallvec;
+    pub use unique::Id;
+
+    pub use crate::collections::{list, List, Set};
+    pub use crate::formula::{Formula, FALSE};
+    pub use crate::goal::{Goal, GoalInfo};
+    pub use crate::inference::Inference;
+    pub use crate::justification::Justification;
+    pub use crate::simplification::{Simplification, Simplified};
 }

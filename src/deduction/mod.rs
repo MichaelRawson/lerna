@@ -1,40 +1,36 @@
 pub mod axiom;
 
-use std::collections::HashSet;
 use unique::Id;
 
-use crate::formula::Formula;
-use crate::goal::Goal;
-use crate::inference::*;
+use crate::collections::{list, List};
+use crate::goal::{Goal, GoalInfo};
+use crate::inference::Inference;
+use crate::justification::Justification;
 use crate::options::OPTIONS;
-use crate::set::Set;
-use crate::simplification::simplify_goal;
 
-pub struct DeductionInfo {
-    axioms: Id<Set<Formula>>,
+pub type Deduced = (Justification, List<Inference>);
+
+pub trait Deduction: Send + Sync {
+    fn deduce(&self, goal: &Id<Goal>, info: &GoalInfo) -> List<Deduced>;
 }
 
-impl DeductionInfo {
-    pub fn new(_goal: &Goal, axioms: Id<Set<Formula>>) -> Self {
-        Self { axioms }
-    }
-}
+pub fn deductions(goal: &Id<Goal>, info: &GoalInfo) -> List<Deduced> {
+    let mut deduced = list![];
 
-pub trait Deduction: Sync {
-    fn deduce(&self, deductions: &mut HashSet<Inferred>, goal: &Goal, info: &DeductionInfo);
-}
-
-pub fn deductions(goal: &Goal, axioms: Id<Set<Formula>>) -> Vec<Vec<Goal>> {
-    let info = DeductionInfo::new(goal, axioms);
-    let mut inferred = HashSet::new();
-
-    for deduction in &OPTIONS.deductions {
-        deduction.deduce(&mut inferred, goal, &info);
+    for d in &OPTIONS.deductions {
+        deduced.extend(d.deduce(goal, info));
     }
 
-    inferred
-        .iter()
-        .map(|inferred| goal.apply_all(inferred))
-        .map(|goals| goals.iter().cloned().map(simplify_goal).collect())
-        .collect()
+    deduced
+}
+
+mod prelude {
+    pub use smallvec::smallvec;
+    pub use unique::Id;
+
+    pub use crate::collections::{list, List, Set};
+    pub use crate::deduction::{Deduced, Deduction};
+    pub use crate::goal::{Goal, GoalInfo};
+    pub use crate::inference::Inference;
+    pub use crate::justification::Justification;
 }

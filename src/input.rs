@@ -1,29 +1,34 @@
-use log::*;
 use memmap::Mmap;
+use smallvec::smallvec;
 use std::io;
 use tptp::syntax::*;
 use tptp::{parse, resolve_include};
 use unique::Id;
 
+use crate::collections::{list, List, Set};
 use crate::formula::Formula;
 use crate::options::OPTIONS;
-use crate::set::Set;
 use crate::symbol::Symbol;
-use crate::system::{input_error, os_error};
+use crate::system::{check_for_timeout, input_error, os_error};
 
 #[derive(Default)]
 struct Loading {
-    axioms: Vec<Id<Formula>>,
+    axioms: List<Id<Formula>>,
     negated_conjecture: Option<Id<Formula>>,
 }
 
 pub struct Loaded {
-    pub axioms: Id<Set<Formula>>,
+    pub axioms: Set<Formula>,
     pub negated_conjecture: Id<Formula>,
 }
 
 impl Loading {
-    fn add_formula(&mut self, _name: &str, role: FormulaRole, formula: Id<Formula>) {
+    fn add_formula(
+        &mut self,
+        _name: &str,
+        role: FormulaRole,
+        formula: Id<Formula>,
+    ) {
         use self::FormulaRole::*;
         let formula = match role {
             Conjecture => Id::new(Formula::Not(formula)),
@@ -37,7 +42,7 @@ impl Loading {
 
         if is_conjecture {
             if self.negated_conjecture.is_some() {
-                error!("multiple conjectures present");
+                log::error!("multiple conjectures present");
                 return input_error();
             }
 
@@ -52,9 +57,9 @@ impl Loading {
     }
 
     fn finish(self) -> Loaded {
-        let axioms = Id::new(Set::new_from_vec(self.axioms));
+        let axioms = self.axioms.into();
         let negated_conjecture = self.negated_conjecture.unwrap_or_else(|| {
-            error!("no conjecture was found to prove");
+            log::error!("no conjecture was found to prove");
             input_error()
         });
 
@@ -65,8 +70,8 @@ impl Loading {
     }
 }
 
-fn open_file(path: &str) -> io::Result<Option<Mmap>> {
-    let file = resolve_include(path)?;
+fn open_file(included: &Included) -> io::Result<Option<Mmap>> {
+    let file = resolve_include(included.clone())?;
     let size = file.metadata()?.len();
 
     // can't mmap() an empty file
@@ -87,10 +92,10 @@ fn load_cnf_formula(formula: CnfFormula, loading: &mut Loading) -> Id<Formula> {
         .into_iter()
         .map(|l| match l {
             Literal(f) => load_fof_formula(f, loading),
-            NegatedLiteral(f) => Id::new(Not(load_fof_formula(f, loading))),
+            NegatedLiteral(f) => Formula::negate(&load_fof_formula(f, loading)),
         })
         .collect();
-    Id::new(Or(Id::new(literals)))
+    Id::new(Or(literals))
 }
 
 fn load_fof_formula(formula: FofFormula, loading: &mut Loading) -> Id<Formula> {
@@ -100,7 +105,7 @@ fn load_fof_formula(formula: FofFormula, loading: &mut Loading) -> Id<Formula> {
         Boolean(true) => Id::new(T),
         Boolean(false) => Id::new(F),
         Infix(_op, _left, _right) => {
-            error!("infix operators not yet supported");
+            log::error!("infix operators not yet supported");
             input_error()
         }
         Predicate(name, children) => {
@@ -108,31 +113,31 @@ fn load_fof_formula(formula: FofFormula, loading: &mut Loading) -> Id<Formula> {
                 let symbol = loading.symbol(name.as_ref());
                 Id::new(Prd(symbol))
             } else {
-                error!("non-empty predicates not yet supported");
+                log::error!("non-empty predicates not yet supported");
                 input_error()
             }
         }
-        Unary(UnaryConnective::Not, f) => Id::new(Not(load_fof_formula(*f, loading))),
+        Unary(UnaryConnective::Not, f) => {
+            Id::new(Not(load_fof_formula(*f, loading)))
+        }
         NonAssoc(connective, left, right) => {
             use self::NonAssocConnective::*;
             let left = load_fof_formula(*left, loading);
             let right = load_fof_formula(*right, loading);
-            Id::new(match connective {
-                LRImplies => Imp(left, right),
-                RLImplies => Imp(right, left),
-                Equivalent => Eqv(left, right),
-                NotEquivalent => Not(Id::new(Eqv(left, right))),
-                NotOr => Not(Id::new(Or(Id::new(set![left, right])))),
-                NotAnd => Not(Id::new(And(Id::new(set![left, right])))),
-            })
+            match connective {
+                LRImplies => Id::new(Imp(left, right)),
+                RLImplies => Id::new(Imp(right, left)),
+                Equivalent => Id::new(Eqv(left, right)),
+                NotEquivalent => Formula::negate(&Id::new(Eqv(left, right))),
+                NotOr => Formula::negate(&Id::new(Or(set![left, right]))),
+                NotAnd => Formula::negate(&Id::new(And(set![left, right]))),
+            }
         }
         Assoc(connective, children) => {
-            let children = Id::new(
-                children
-                    .into_iter()
-                    .map(|f| load_fof_formula(f, loading))
-                    .collect(),
-            );
+            let children = children
+                .into_iter()
+                .map(|f| load_fof_formula(f, loading))
+                .collect();
 
             Id::new(match connective {
                 AssocConnective::Or => Or(children),
@@ -140,7 +145,7 @@ fn load_fof_formula(formula: FofFormula, loading: &mut Loading) -> Id<Formula> {
             })
         }
         Quantified(_quantifier, _bound, _formula) => {
-            error!("quantified formulae not yet supported");
+            log::error!("quantified formulae not yet supported");
             input_error()
         }
     }
@@ -149,9 +154,9 @@ fn load_fof_formula(formula: FofFormula, loading: &mut Loading) -> Id<Formula> {
 fn load_statement<'a>(statement: Statement<'a>, loading: &'a mut Loading) {
     use self::Statement::*;
     match statement {
-        Include(path, None) => load_file(path.to_str().unwrap(), loading),
+        Include(included, None) => load_file(&included, loading),
         Include(_path, _selections) => {
-            error!("include() selections are not supported");
+            log::error!("include() selections are not supported");
             input_error()
         }
         Cnf(name, role, formula, _annotations) => {
@@ -165,13 +170,14 @@ fn load_statement<'a>(statement: Statement<'a>, loading: &'a mut Loading) {
     }
 }
 
-fn load_file(path: &str, loading: &mut Loading) {
-    info!("loading from '{}'...", path);
+fn load_file(path: &Included, loading: &mut Loading) {
+    log::info!("loading from '{}'...", path);
 
-    let mapped = open_file(path).unwrap_or_else(|e| {
-        error!("OS error: {}", e);
+    let mapped = open_file(&path).unwrap_or_else(|e| {
+        log::error!("OS error: {}", e);
         os_error()
     });
+    check_for_timeout();
 
     let bytes = &*match mapped {
         Some(bytes) => bytes,
@@ -179,12 +185,16 @@ fn load_file(path: &str, loading: &mut Loading) {
     };
 
     for result in parse(bytes) {
-        OPTIONS.check_time();
+        check_for_timeout();
         let statement = result.unwrap_or_else(|e| {
             let start = bytes.as_ptr() as usize;
             let position = e.position.as_ptr() as usize;
             let offset = position - start;
-            error!("syntax error: in '{}', starting at byte {}", path, offset);
+            log::error!(
+                "syntax error: in '{}', starting at byte {}",
+                path,
+                offset
+            );
             input_error()
         });
         load_statement(statement, loading);
@@ -194,10 +204,10 @@ fn load_file(path: &str, loading: &mut Loading) {
 pub fn load() -> Loaded {
     let start = &OPTIONS.file;
     let mut loading = Loading::default();
-    load_file(start, &mut loading);
+    load_file(&Included(&start), &mut loading);
     let loaded = loading.finish();
 
-    info!(
+    log::info!(
         "...load complete, read {} axiom(s) and 1 conjecture",
         loaded.axioms.len()
     );

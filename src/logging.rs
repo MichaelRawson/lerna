@@ -1,7 +1,16 @@
 use fern::Dispatch;
+use log::LevelFilter;
 use std::io::stderr;
 
-pub fn initialise() {
+use crate::options::OPTIONS;
+
+pub fn initialize() {
+    let level = if OPTIONS.quiet {
+        LevelFilter::Error
+    } else {
+        LevelFilter::Debug
+    };
+
     Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -11,7 +20,7 @@ pub fn initialise() {
                 message
             ))
         })
-        .level(log::LevelFilter::Trace)
+        .level(level)
         .chain(stderr())
         .apply()
         .expect("failed to start application logging");

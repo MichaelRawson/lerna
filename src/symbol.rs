@@ -1,14 +1,12 @@
-use lazy_static::lazy_static;
 use std::fmt;
 use unique::allocators::HashAllocator;
-use unique::{make_allocator, Allocated};
+use unique::make_allocator;
 
 #[derive(PartialEq, Eq, Hash)]
 pub enum Symbol {
     Original(String),
 }
-
-make_allocator!(Symbol, __SYMBOL_ALLOC, HashAllocator);
+make_allocator!(Symbol, SYMBOL_ALLOC, HashAllocator);
 
 impl fmt::Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
