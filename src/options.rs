@@ -3,20 +3,20 @@ use lazy_static::lazy_static;
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
-use crate::deduction;
-use crate::deduction::Deduction;
-use crate::simplification;
-use crate::simplification::Simplification;
+use crate::heuristic::null::Null;
+use crate::heuristic::Heuristic;
+use crate::oracle::z3::Z3;
+use crate::oracle::Oracle;
 
 pub struct Options {
     pub file: String,
     pub start_time: SystemTime,
     pub time: Duration,
-    pub skepticism: f32,
-    pub goal_queue_size: usize,
-    pub deductions: Vec<Box<dyn Deduction>>,
-    pub simplifications: Vec<Box<dyn Simplification>>,
+    pub heuristic: Box<dyn Heuristic>,
+    pub oracle: Box<dyn Oracle>,
+    pub oracle_time: u16,
     pub quiet: bool,
+    pub skepticism: f32,
 }
 
 fn validate<T: FromStr>(arg: &str, error: &str) -> Result<(), String> {
@@ -61,6 +61,20 @@ impl Options {
                     .default_value("30"),
             )
             .arg(
+                Arg::with_name("oracle time")
+                    .help("Oracle time limit")
+                    .long("oracle_time")
+                    .takes_value(true)
+                    .value_name("MILLIS")
+                    .validator(|x| {
+                        validate::<u16>(
+                            &x,
+                            "should be a positive number of milliseconds",
+                        )
+                    })
+                    .default_value("10"),
+            )
+            .arg(
                 Arg::with_name("skepticism")
                     .help("Exploitation constant")
                     .long("skepticism")
@@ -72,17 +86,6 @@ impl Options {
                     .default_value("2"),
             )
             .arg(
-                Arg::with_name("goal_queue_size")
-                    .help("Max goals queued")
-                    .long("goal_queue_size")
-                    .takes_value(true)
-                    .value_name("SIZE")
-                    .validator(|x| {
-                        validate::<usize>(&x, "should be a positive number")
-                    })
-                    .default_value("1024"),
-            )
-            .arg(
                 Arg::with_name("quiet")
                     .short("q")
                     .long("quiet")
@@ -92,23 +95,20 @@ impl Options {
 
         let file = get_validated_arg(&matches, "FILE");
         let time = Duration::from_secs(get_validated_arg(&matches, "time"));
+        let heuristic = Box::new(Null);
+        let oracle = Box::new(Z3);
+        let oracle_time = get_validated_arg(&matches, "oracle time");
         let skepticism = get_validated_arg(&matches, "skepticism");
-        let goal_queue_size = get_validated_arg(&matches, "goal_queue_size");
         let quiet = matches.is_present("quiet");
-
-        let deductions: Vec<Box<dyn Deduction>> =
-            vec![Box::new(deduction::axiom::Axiom)];
-        let simplifications: Vec<Box<dyn Simplification>> =
-            vec![Box::new(simplification::contradiction::Contradiction)];
 
         Options {
             file,
             start_time,
             time,
+            heuristic,
+            oracle,
+            oracle_time,
             skepticism,
-            goal_queue_size,
-            deductions,
-            simplifications,
             quiet,
         }
     }

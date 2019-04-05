@@ -3,37 +3,32 @@ mod collections;
 
 mod deduction;
 mod formula;
-mod goal;
-//mod heuristic;
-mod inference;
+mod heuristic;
 mod input;
-mod justification;
 mod logging;
 mod options;
-//mod prover;
-mod score;
+mod oracle;
+mod prover;
 mod search;
 mod simplification;
 mod symbol;
 mod system;
+mod term;
 
-//use crate::prover::Prover;
+use crate::input::load;
+use crate::prover::Prover;
+use crate::simplification::simplify;
+use crate::system::check_for_timeout;
 
 fn main() {
     options::initialize();
     logging::initialize();
-    system::check_for_timeout();
+    check_for_timeout(true);
 
-    let loaded = input::load();
-    system::check_for_timeout();
+    let loaded = load();
+    let simplified = simplify(&loaded.goal);
+    check_for_timeout(true);
 
-    /*
-    let result = Prover::new(loaded.axioms, loaded.negated_conjecture).run();
-    
-    if result.success {
-        println!("% SZS Status THM");
-    } else {
-        system::time_out()
-    };
-    */
+    let mut prover = Prover::new(simplified);
+    prover.run();
 }

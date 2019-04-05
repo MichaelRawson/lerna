@@ -12,14 +12,16 @@ pub fn input_error<T>() -> T {
     exit(1);
 }
 
-pub fn time_out<T>() -> T {
-    println!("% SZS Status TimeOut");
+pub fn time_out<T>(print: bool) -> T {
+    if print {
+        println!("% SZS Status TimeOut");
+    }
     exit(1);
 }
 
-pub fn check_for_timeout() {
+pub fn check_for_timeout(print: bool) {
     if !within_time() {
-        time_out()
+        time_out(print)
     }
 }
 

@@ -1,36 +1,15 @@
-pub mod axiom;
+mod complete;
+mod weakening;
 
+use std::collections::HashSet;
 use unique::Id;
 
-use crate::collections::{list, List};
-use crate::goal::{Goal, GoalInfo};
-use crate::inference::Inference;
-use crate::justification::Justification;
-use crate::options::OPTIONS;
+use crate::collections::IdSet;
+use crate::formula::Formula;
 
-pub type Deduced = (Justification, List<Inference>);
-
-pub trait Deduction: Send + Sync {
-    fn deduce(&self, goal: &Id<Goal>, info: &GoalInfo) -> List<Deduced>;
-}
-
-pub fn deductions(goal: &Id<Goal>, info: &GoalInfo) -> List<Deduced> {
-    let mut deduced = list![];
-
-    for d in &OPTIONS.deductions {
-        deduced.extend(d.deduce(goal, info));
-    }
-
+pub fn deductions(f: &Id<Formula>) -> HashSet<IdSet<Formula>> {
+    let mut deduced = HashSet::new();
+    complete::complete_deductions(&mut deduced, f);
+    weakening::weakening_deductions(&mut deduced, f);
     deduced
-}
-
-mod prelude {
-    pub use smallvec::smallvec;
-    pub use unique::Id;
-
-    pub use crate::collections::{list, List, Set};
-    pub use crate::deduction::{Deduced, Deduction};
-    pub use crate::goal::{Goal, GoalInfo};
-    pub use crate::inference::Inference;
-    pub use crate::justification::Justification;
 }

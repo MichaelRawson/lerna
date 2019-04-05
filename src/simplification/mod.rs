@@ -1,50 +1,37 @@
-pub mod contradiction;
+mod propositional;
 
 use unique::Id;
 
-use crate::collections::{list, List};
-use crate::goal::{Goal, GoalInfo};
-use crate::inference::Inference;
-use crate::justification::Justification;
-use crate::options::OPTIONS;
+use crate::formula::Formula;
 
-pub type Simplified = (Justification, Inference);
-
-pub trait Simplification: Send + Sync {
-    fn simplify(&self, goal: &Id<Goal>, info: &GoalInfo) -> Option<Simplified>;
+fn simplify_children(f: &Id<Formula>) -> Id<Formula> {
+    use Formula::*;
+    match **f {
+        T | F | Prd(_, _) | Eq(_) => f.clone(),
+        Not(ref p) => Id::new(Not(simplify(p))),
+        Imp(ref p, ref q) => Id::new(Imp(simplify(p), simplify(q))),
+        And(ref ps) => Id::new(And(ps.into_iter().map(simplify).collect())),
+        Or(ref ps) => Id::new(Or(ps.into_iter().map(simplify).collect())),
+        Eqv(ref ps) => Id::new(Eqv(ps.into_iter().map(simplify).collect())),
+        All(ref p) => Id::new(All(simplify(p))),
+        Ex(ref p) => Id::new(Ex(simplify(p))),
+    }
 }
 
-pub fn simplify(
-    goal: &Id<Goal>,
-    info: &GoalInfo,
-) -> (Id<Goal>, List<Justification>) {
-    let mut goal = goal.clone();
-    let mut log = list![];
+fn simplify_step(f: &Id<Formula>) -> Id<Formula> {
+    let f = simplify_children(f);
+    propositional::simplify_propositional(&f)
+}
+
+pub fn simplify(f: &Id<Formula>) -> Id<Formula> {
+    let mut f = f.clone();
     let mut fresh = true;
 
     while fresh {
-        fresh = false;
-        for s in &OPTIONS.simplifications {
-            if let Some((justification, inference)) = s.simplify(&goal, info) {
-                let new = Goal::apply(&goal, &inference);
-                fresh |= new != goal;
-                goal = new;
-                log.push(justification);
-            }
-        }
+        let simplified = simplify_step(&f);
+        fresh = simplified != f;
+        f = simplified;
     }
 
-    (goal, log)
-}
-
-mod prelude {
-    pub use smallvec::smallvec;
-    pub use unique::Id;
-
-    pub use crate::collections::{list, List, Set};
-    pub use crate::formula::{Formula, FALSE};
-    pub use crate::goal::{Goal, GoalInfo};
-    pub use crate::inference::Inference;
-    pub use crate::justification::Justification;
-    pub use crate::simplification::{Simplification, Simplified};
+    f
 }
