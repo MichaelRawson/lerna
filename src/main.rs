@@ -9,8 +9,10 @@ mod logging;
 mod options;
 mod oracle;
 mod prover;
+mod score;
 mod search;
 mod simplification;
+mod status;
 mod symbol;
 mod system;
 mod term;
@@ -18,6 +20,7 @@ mod term;
 use crate::input::load;
 use crate::prover::Prover;
 use crate::simplification::simplify;
+use crate::status::Status;
 use crate::system::check_for_timeout;
 
 fn main() {
@@ -30,5 +33,13 @@ fn main() {
     check_for_timeout(true);
 
     let mut prover = Prover::new(simplified);
-    prover.run();
+    match prover.run() {
+        Status::Sat => {
+            println!("% SZS Status CounterSatisfiable");
+        },
+        Status::Unsat => {
+            println!("% SZS Status Theorem");
+        },
+        _ => unreachable!()
+    }
 }

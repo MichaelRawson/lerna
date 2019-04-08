@@ -1,7 +1,8 @@
 use unique::Id;
 
 use crate::formula::Formula;
-use crate::heuristic::{Heuristic, Score};
+use crate::heuristic::Heuristic;
+use crate::score::Score;
 
 pub struct Null;
 

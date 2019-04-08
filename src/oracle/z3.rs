@@ -7,7 +7,8 @@ use unique::Id;
 use crate::collections::IdList;
 use crate::formula::Formula;
 use crate::options::OPTIONS;
-use crate::oracle::{Consulted, Oracle};
+use crate::oracle::Oracle;
+use crate::status::Status;
 use crate::symbol::Symbol;
 use crate::term::Term;
 
@@ -19,7 +20,6 @@ fn symbol_name(s: &Symbol) -> String {
 
 fn write_header<W: Write>(w: &mut W, f: &Id<Formula>) -> io::Result<()> {
     writeln!(w, "(set-option :smt.auto-config false)")?;
-    writeln!(w, "(set-option :smt.mbqi true)")?;
     writeln!(w, "(declare-sort object)")?;
 
     for (symbol, arity) in Formula::predicate_symbols(f) {
@@ -174,7 +174,7 @@ fn write_stdin<W: Write>(w: &mut W, f: &Id<Formula>) -> io::Result<()> {
     writeln!(w, "(check-sat)")
 }
 
-fn run(f: &Id<Formula>) -> Consulted {
+fn run(f: &Id<Formula>) -> Status {
     let mut z3 = Command::new("z3")
         .arg("-in")
         .arg(format!("-t:{}", OPTIONS.oracle_time))
@@ -190,15 +190,15 @@ fn run(f: &Id<Formula>) -> Consulted {
     assert!(run.status.success(), "z3 returned non-zero exit status");
     let stdout: &[u8] = &run.stdout;
     match stdout {
-        b"sat\n" => Consulted::Sat,
-        b"unsat\n" => Consulted::Unsat,
-        b"unknown\n" => Consulted::Unknown,
+        b"sat\n" => Status::Sat,
+        b"unsat\n" => Status::Unsat,
+        b"unknown\n" => Status::Unknown,
         _ => panic!("z3 produced unknown output: {:?}", stdout),
     }
 }
 
 impl Oracle for Z3 {
-    fn consult(&self, f: &Id<Formula>) -> Consulted {
+    fn consult(&self, f: &Id<Formula>) -> Status {
         run(f)
     }
 }
