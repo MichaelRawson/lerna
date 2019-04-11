@@ -21,7 +21,7 @@ pub struct Prover {
 
 impl Prover {
     pub fn new(problem: Id<Formula>) -> Self {
-        let search = Search::new(problem.clone());
+        let search = Search::new(&problem);
         Self { problem, search }
     }
 
@@ -37,12 +37,18 @@ impl Prover {
 
         let running = AtomicBool::new(true);
         thread::scope(|s| {
+            /*
             s.spawn(|_| {
-                consult_task(&running, search2oracle_receive, oracle2search_send)
+                oracle_task(&running, search2oracle_receive, oracle2search_send)
             });
             s.spawn(|_| {
-                heuristic_task(&running, search2heuristic_receive, heuristic2search_send)
+                heuristic_task(
+                    &running,
+                    search2heuristic_receive,
+                    heuristic2search_send,
+                )
             });
+            */
 
             let result = search_task(
                 &mut self.search,
@@ -61,7 +67,7 @@ impl Prover {
     }
 }
 
-pub fn consult_task(
+pub fn oracle_task(
     running: &AtomicBool,
     oracle_in: Receiver<Id<Formula>>,
     oracle_out: Sender<(Id<Formula>, Status)>,
@@ -71,7 +77,6 @@ pub fn consult_task(
         if let Ok(f) = oracle_in.try_recv() {
             let consultation = consult(&f);
             if oracle_out.send((f, consultation)).is_err() {
-                log::debug!("outwards channel disconnected, exiting...");
                 break;
             }
         }
@@ -99,7 +104,6 @@ pub fn heuristic_task(
 
         for scored in batch.into_iter().zip(scores.into_iter()) {
             if heuristic_out.send(scored).is_err() {
-                log::debug!("outwards channel disconnected, exiting...");
                 return;
             }
         }
@@ -108,8 +112,8 @@ pub fn heuristic_task(
 
 pub fn search_task(
     search: &mut Search,
-    _heuristic_send: Sender<Id<Formula>>,
-    _oracle_send: Sender<Id<Formula>>,
+    heuristic_send: Sender<Id<Formula>>,
+    oracle_send: Sender<Id<Formula>>,
     heuristic_recv: Receiver<(Id<Formula>, Score)>,
     oracle_recv: Receiver<(Id<Formula>, Status)>,
 ) -> Status {
@@ -117,10 +121,19 @@ pub fn search_task(
         check_for_timeout(true);
 
         if let Ok((f, status)) = oracle_recv.try_recv() {
-            search.set_status(f, status);
-        }
-        else if let Ok((f, score)) = heuristic_recv.try_recv() {
-            search.set_score(f, score);
+            log::debug!("{:?}: {:?}", f, status);
+            if status != Status::Unknown {
+                search.set_status(&f, status);
+            }
+        } else if let Ok((f, score)) = heuristic_recv.try_recv() {
+            log::debug!("{:?}: {:?}", f, score);
+            search.set_score(&f, score);
+        } else {
+            let fs = search.do_step();
+            for f in fs {
+                oracle_send.send(f.clone()).expect("send failed");
+                heuristic_send.send(f).expect("send failed");
+            }
         }
     }
 

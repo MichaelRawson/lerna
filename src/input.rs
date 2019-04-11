@@ -60,13 +60,13 @@ fn load_term(term: FofTerm, bound: &mut Vec<Id<Symbol>>) -> Id<Term> {
     match term {
         Variable(x) => {
             let symbol = load_symbol(x.as_ref());
-            let index = (bound.len() - 1)
-                - bound.iter().rposition(|x| x == &symbol).unwrap_or_else(
+            let index = bound.len()
+                - (bound.iter().rposition(|x| x == &symbol).unwrap_or_else(
                     || {
                         log::error!("unbound variable: {}", x);
                         input_error()
                     },
-                );
+                ) + 1);
             Id::new(Var(index))
         }
         Functor(f, ts) => {

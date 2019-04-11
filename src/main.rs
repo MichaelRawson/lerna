@@ -36,10 +36,10 @@ fn main() {
     match prover.run() {
         Status::Sat => {
             println!("% SZS Status CounterSatisfiable");
-        },
+        }
         Status::Unsat => {
             println!("% SZS Status Theorem");
-        },
-        _ => unreachable!()
+        }
+        _ => unreachable!(),
     }
 }

@@ -20,9 +20,10 @@ impl Add for Status {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        match self {
-            Sat | Unknown => other,
-            Unsat => Unsat,
+        match (self, other) {
+            (Unsat, _) | (_, Unsat) => Unsat,
+            (Unknown, _) | (_, Unknown) => Unknown,
+            (Sat, Sat) => Sat,
         }
     }
 }
@@ -37,9 +38,10 @@ impl Mul for Status {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self {
-        match self {
-            Sat => Sat,
-            Unsat | Unknown => other,
+        match (self, other) {
+            (Sat, _) | (_, Sat) => Sat,
+            (Unknown, _) | (_, Unknown) => Unknown,
+            (Unsat, Unsat) => Unsat,
         }
     }
 }

@@ -20,6 +20,9 @@ fn symbol_name(s: &Symbol) -> String {
 
 fn write_header<W: Write>(w: &mut W, f: &Id<Formula>) -> io::Result<()> {
     writeln!(w, "(set-option :smt.auto-config false)")?;
+    writeln!(w, "(set-option :smt.ematching false)")?;
+    writeln!(w, "(set-option :smt.mbqi true)")?;
+    writeln!(w, "(set-option :smt.mbqi.max_iterations 0)")?;
     writeln!(w, "(declare-sort object)")?;
 
     for (symbol, arity) in Formula::predicate_symbols(f) {
@@ -187,8 +190,13 @@ fn run(f: &Id<Formula>) -> Status {
     write_stdin(stdin, f).expect("failed to write z3 stdin");
     let run = z3.wait_with_output().expect("z3 failed");
 
+    if !run.status.success() {
+        log::error!("z3 failed: {}", std::str::from_utf8(&run.stdout).unwrap());
+        panic!("z3 failed, what do?");
+    }
     assert!(run.status.success(), "z3 returned non-zero exit status");
     let stdout: &[u8] = &run.stdout;
+    return Status::Unknown;
     match stdout {
         b"sat\n" => Status::Sat,
         b"unsat\n" => Status::Unsat,

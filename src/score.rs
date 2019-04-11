@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt;
+use std::iter::Sum;
+use std::ops::Div;
 
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Score(pub f32);
@@ -8,6 +10,20 @@ impl Score {
     pub fn new(score: f32) -> Self {
         assert!(score.is_finite());
         Score(score)
+    }
+}
+
+impl Sum for Score {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        Score::new(iter.map(|s| s.0).sum())
+    }
+}
+
+impl Div for Score {
+    type Output = Score;
+
+    fn div(self, other: Self) -> Score {
+        Score::new(self.0 / other.0)
     }
 }
 

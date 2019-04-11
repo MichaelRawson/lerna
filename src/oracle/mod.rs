@@ -11,11 +11,5 @@ pub trait Oracle: Sync + Send {
 }
 
 pub fn consult(f: &Id<Formula>) -> Status {
-    use Formula::*;
-    use Status::*;
-    match **f {
-        T => Sat,
-        F => Unsat,
-        _ => OPTIONS.oracle.consult(f),
-    }
+    OPTIONS.oracle.consult(f)
 }
