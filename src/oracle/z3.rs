@@ -14,19 +14,19 @@ use crate::term::Term;
 
 pub struct Z3;
 
-fn symbol_name(s: &Symbol) -> String {
-    format!("{:?}", s)
+fn symbol_name(s: &Symbol, arity: usize) -> String {
+    format!("{:?}_{}", s, arity)
 }
 
 fn write_header<W: Write>(w: &mut W, f: &Id<Formula>) -> io::Result<()> {
     writeln!(w, "(set-option :smt.auto-config false)")?;
     writeln!(w, "(set-option :smt.ematching false)")?;
     writeln!(w, "(set-option :smt.mbqi true)")?;
-    writeln!(w, "(set-option :smt.mbqi.max_iterations 0)")?;
+    writeln!(w, "(set-option :smt.mbqi.max_iterations 10)")?;
     writeln!(w, "(declare-sort object)")?;
 
     for (symbol, arity) in Formula::predicate_symbols(f) {
-        let name = symbol_name(&symbol);
+        let name = symbol_name(&symbol, arity);
         let args = iter::repeat("object")
             .take(arity)
             .collect::<Vec<_>>()
@@ -35,7 +35,7 @@ fn write_header<W: Write>(w: &mut W, f: &Id<Formula>) -> io::Result<()> {
     }
 
     for (symbol, arity) in Formula::function_symbols(f) {
-        let name = symbol_name(&symbol);
+        let name = symbol_name(&symbol, arity);
         let args = iter::repeat("object")
             .take(arity)
             .collect::<Vec<_>>()
@@ -68,9 +68,9 @@ fn write_term<W: Write>(
         Var(n) => write!(w, "X{}", (bound - 1) - n),
         Fn(ref f, ref ts) => {
             if ts.is_empty() {
-                write!(w, "{}", symbol_name(&f))
+                write!(w, "{}", symbol_name(&f, 0))
             } else {
-                write!(w, "({}", symbol_name(&f))?;
+                write!(w, "({}", symbol_name(&f, ts.len()))?;
                 write_term_list(w, ts, bound)?;
                 write!(w, ")")
             }
@@ -112,9 +112,9 @@ fn write_formula<W: Write>(
         }
         Prd(ref p, ref ts) => {
             if ts.is_empty() {
-                write!(w, "{}", symbol_name(p))
+                write!(w, "{}", symbol_name(p, 0))
             } else {
-                write!(w, "({}", symbol_name(p))?;
+                write!(w, "({}", symbol_name(p, ts.len()))?;
                 write_term_list(w, ts, bound)?;
                 write!(w, ")")
             }
@@ -196,7 +196,6 @@ fn run(f: &Id<Formula>) -> Status {
     }
     assert!(run.status.success(), "z3 returned non-zero exit status");
     let stdout: &[u8] = &run.stdout;
-    return Status::Unknown;
     match stdout {
         b"sat\n" => Status::Sat,
         b"unsat\n" => Status::Unsat,

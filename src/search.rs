@@ -1,4 +1,3 @@
-use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet, VecDeque};
 use unique::Id;
 
@@ -18,38 +17,24 @@ pub struct Node {
     visits: usize,
 }
 
-impl Node {
-    fn add_parent(&mut self, parent: &Id<Formula>) {
-        if !self.parents.contains(parent) {
-            self.parents.push(parent.clone());
-        }
-    }
-
-    fn children(&self) -> &Vec<IdSet<Formula>> {
-        self.children.as_ref().unwrap()
-    }
-}
-
 fn uct(parent_visits: usize, child_visits: usize, score: Score) -> Score {
     let parent_visits = parent_visits as f32;
     let child_visits = (child_visits + 1) as f32;
     let skepticism = OPTIONS.skepticism;
-    Score::new(
-        score.0 + (skepticism * parent_visits.ln() / child_visits).sqrt(),
-    )
+    (score.0 + (skepticism * parent_visits.ln() / child_visits).sqrt()).into()
 }
 
 pub struct Search {
     root: Id<Formula>,
-    pub nodes: HashMap<Id<Formula>, RefCell<Node>>,
+    pub nodes: HashMap<Id<Formula>, Node>,
 }
 
 impl Search {
-    pub fn new(f: &Id<Formula>) -> Self {
+    pub fn new(f: Id<Formula>) -> Self {
         let root = f.clone();
         let nodes = HashMap::new();
         let mut new = Self { nodes, root };
-        new.insert_node(&f);
+        new.insert_node(f);
         new
     }
 
@@ -67,169 +52,202 @@ impl Search {
         self.propagate_score(f)
     }
 
-    pub fn do_step(&mut self) -> Vec<Id<Formula>> {
-        let (leaf, path) = self.select();
-        let new_formulae = self.expand(&leaf, &path);
+    pub fn do_step(&mut self) -> HashSet<Id<Formula>> {
+        assert_eq!(self.status(), Status::Unknown);
 
-        if self.node(&leaf).status != Status::Unknown {
+        let leaf = self.select();
+        assert_eq!(self.node_status(&leaf), Status::Unknown);
+
+        let mut ancestors: HashSet<_> =
+            self.ancestors_of(&leaf).into_iter().collect();
+        ancestors.insert(leaf.clone());
+        let new_formulae = self.expand(&leaf, &ancestors);
+
+        if self.node_status(&leaf) != Status::Unknown {
             self.propagate_status(&leaf);
         }
 
         new_formulae
     }
 
-    fn insert_node(&mut self, f: &Id<Formula>) {
-        self.nodes.insert(f.clone(), RefCell::default());
+    fn node(&self, f: &Id<Formula>) -> &Node {
+        self.nodes.get(f).expect("node did not exist")
     }
 
-    fn node(&self, f: &Id<Formula>) -> Ref<Node> {
-        self.nodes[f].borrow()
+    fn node_mut(&mut self, f: &Id<Formula>) -> &mut Node {
+        self.nodes.get_mut(f).expect("node did not exist")
     }
 
-    fn node_mut(&self, f: &Id<Formula>) -> RefMut<Node> {
-        self.nodes[f].borrow_mut()
+    fn node_children(&self, f: &Id<Formula>) -> &Vec<IdSet<Formula>> {
+        self.node(f)
+            .children
+            .as_ref()
+            .expect("node had no children")
+    }
+
+    fn node_parents(&self, f: &Id<Formula>) -> &Vec<Id<Formula>> {
+        &self.node(f).parents
+    }
+
+    fn node_score(&self, f: &Id<Formula>) -> Score {
+        self.node(f).score
+    }
+
+    fn node_status(&self, f: &Id<Formula>) -> Status {
+        self.node(f).status
+    }
+
+    fn node_visits(&self, f: &Id<Formula>) -> usize {
+        self.node(f).visits
+    }
+
+    fn insert_node(&mut self, f: Id<Formula>) {
+        self.nodes.insert(f, Node::default());
     }
 
     fn ancestors_of(&self, leaf: &Id<Formula>) -> Vec<Id<Formula>> {
         let mut done = HashSet::new();
         let mut todo = VecDeque::new();
-        let mut parents = vec![];
-        done.insert(leaf.clone());
-        todo.extend(self.node(&leaf).parents.iter().cloned());
+        let mut ancestors = vec![];
+
+        done.insert(leaf);
+        todo.extend(self.node_parents(&leaf).iter());
 
         while let Some(next) = todo.pop_front() {
             if !done.contains(&next) {
-                done.insert(next.clone());
-                todo.extend(self.node(&next).parents.iter().cloned());
-                parents.push(next);
+                done.insert(next);
+                todo.extend(self.node_parents(&next).iter());
+                ancestors.push(next.clone());
             }
         }
 
-        parents
+        ancestors
     }
 
-    fn select(&self) -> (Id<Formula>, HashSet<Id<Formula>>) {
-        let mut path = HashSet::new();
-        let mut current = self.root.clone();
-        while self.node(&current).children.is_some() {
-            self.node_mut(&current).visits += 1;
-            let node = self.node(&current);
-
-            log::debug!("{:?}, {:?}", current, node);
-            let next = node
-                .children()
+    fn computed_status(&self, f: &Id<Formula>) -> Status {
+        if *f == Id::new(Formula::F) {
+            Status::Unsat
+        } else {
+            self.node_children(&f)
                 .iter()
-                .filter(|inference| {
-                    !inference
-                        .into_iter()
-                        .any(|f| self.node(f).status == Status::Sat)
+                .map(|inference| {
+                    inference.into_iter().map(|f| self.node_status(f)).product()
                 })
-                .max_by_key(|inference| {
-                    let score = inference
-                        .into_iter()
-                        .map(|f| self.node(f).score)
-                        .min()
-                        .unwrap();
-                    let parent_visits = node.visits;
-                    let child_visits = inference
-                        .into_iter()
-                        .map(|f| self.node(f).visits)
-                        .sum();
-                    uct(parent_visits, child_visits, score)
-                })
-                .unwrap()
-                .into_iter()
-                .filter(|f| self.node(f).status != Status::Unsat)
-                .min_by_key(|f| self.node(f).score)
-                .unwrap()
-                .clone();
-
-            path.insert(current);
-            current = next;
+                .sum()
         }
-
-        self.node_mut(&current).visits += 1;
-        path.insert(current.clone());
-        (current, path)
-    }
-
-    fn expand(
-        &mut self,
-        f: &Id<Formula>,
-        filter: &HashSet<Id<Formula>>,
-    ) -> Vec<Id<Formula>> {
-        let (deduced, new_formulae) = {
-            let mut new_formulae = vec![];
-            let deduced = deductions(f)
-                .into_iter()
-                .filter(|inference| {
-                    !inference.into_iter().any(|f| filter.contains(f))
-                })
-                .collect::<Vec<_>>();
-
-            for inference in &deduced {
-                for new in inference.into_iter() {
-                    self.nodes.entry(new.clone()).or_default();
-                    self.node_mut(new).add_parent(f);
-                    new_formulae.push(new.clone());
-                }
-            }
-
-            (deduced, new_formulae)
-        };
-
-        let mut node = self.node_mut(f);
-        if deduced.is_empty() {
-            node.status = Status::Sat;
-        } else if deduced.contains(&idset![Id::new(Formula::F)]) {
-            node.status = Status::Unsat;
-        }
-
-        node.children = Some(deduced);
-        new_formulae
     }
 
     fn propagate_status(&mut self, start: &Id<Formula>) {
         for f in self.ancestors_of(start) {
-            let status = self
-                .node(&f)
-                .children()
-                .iter()
-                .map(|fs| fs.into_iter().map(|f| self.node(f).status).product())
-                .sum::<Status>();
-            self.node_mut(&f).status = status;
+            self.node_mut(&f).status = self.computed_status(&f);
         }
     }
 
     fn propagate_score(&mut self, start: &Id<Formula>) {
         use Status::*;
         for f in self.ancestors_of(start) {
-            if self.node(&f).children.is_none() {
-                log::debug!("{:?}", f);
-                log::debug!("{:#?}", self.nodes);
-                assert!(false);
-            }
-            let score = self
-                .node(&f)
-                .children()
+            self.node_mut(&f).score = self
+                .node_children(&f)
                 .iter()
-                .map(|fs| {
-                    fs.into_iter()
-                        .map(|f| {
-                            let node = self.node(f);
-                            let score = node.score;
-                            let status = node.status;
-                            match status {
-                                Unsat => Score::new(1.0),
-                                _ => score,
+                .map(|inference| {
+                    let mut total = Score::default();
+                    let mut count = 0;
+                    for f in inference {
+                        let status = self.node_status(f);
+                        match status {
+                            Sat => return 0.into(),
+                            Unsat => {
+                                continue;
                             }
-                        })
-                        .sum::<Score>()
-                        / Score::new(fs.len() as f32)
+                            Unknown => {
+                                total += self.node_score(f);
+                                count += 1;
+                            }
+                        }
+                    }
+                    if count != 0 {
+                        total / count.into()
+                    } else {
+                        1.into()
+                    }
                 })
                 .max()
                 .unwrap_or_default();
-            self.node_mut(&f).score = score;
         }
+    }
+
+    fn select(&mut self) -> Id<Formula> {
+        let mut current = self.root.clone();
+
+        while self.node(&current).children.is_some() {
+            assert_eq!(self.node_status(&current), Status::Unknown);
+
+            let parent_visits = self.node_visits(&current);
+            let children = self.node_children(&current).iter();
+            let possible = children.filter(|inference| {
+                !inference
+                    .into_iter()
+                    .any(|f| self.node_status(f) == Status::Sat)
+            });
+            let selected_inference = possible
+                .max_by_key(|inference| {
+                    let score = inference
+                        .into_iter()
+                        .map(|f| self.node_score(f))
+                        .min()
+                        .expect("inference had no children");
+                    let child_visits = inference
+                        .into_iter()
+                        .map(|f| self.node_visits(f))
+                        .sum();
+                    uct(parent_visits, child_visits, score)
+                })
+                .expect("no possible inferences");
+            let possible_formulae = selected_inference
+                .into_iter()
+                .filter(|f| self.node_status(f) != Status::Unsat);
+            let selected = possible_formulae
+                .min_by_key(|f| self.node_score(f))
+                .expect("inference had no possible children")
+                .clone();
+
+            self.node_mut(&current).visits += 1;
+            current = selected;
+        }
+
+        self.node_mut(&current).visits += 1;
+        current
+    }
+
+    fn expand(
+        &mut self,
+        leaf: &Id<Formula>,
+        filter: &HashSet<Id<Formula>>,
+    ) -> HashSet<Id<Formula>> {
+        let mut new_formulae = HashSet::new();
+        let deduced = deductions(leaf)
+            .into_iter()
+            .filter(|inference| {
+                !inference.into_iter().any(|f| filter.contains(f))
+            })
+            .collect::<Vec<_>>();
+
+        for inference in &deduced {
+            for f in inference.into_iter() {
+                if !self.nodes.contains_key(f) {
+                    self.insert_node(f.clone());
+                    new_formulae.insert(f.clone());
+                }
+
+                let parents = self.node_parents(f);
+                if !parents.contains(leaf) {
+                    self.node_mut(f).parents.push(leaf.clone());
+                }
+            }
+        }
+
+        self.node_mut(leaf).children = Some(deduced);
+        self.node_mut(leaf).status = self.computed_status(leaf);
+        new_formulae
     }
 }

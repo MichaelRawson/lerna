@@ -21,7 +21,7 @@ pub struct Prover {
 
 impl Prover {
     pub fn new(problem: Id<Formula>) -> Self {
-        let search = Search::new(&problem);
+        let search = Search::new(problem.clone());
         Self { problem, search }
     }
 
@@ -37,7 +37,6 @@ impl Prover {
 
         let running = AtomicBool::new(true);
         thread::scope(|s| {
-            /*
             s.spawn(|_| {
                 oracle_task(&running, search2oracle_receive, oracle2search_send)
             });
@@ -48,7 +47,6 @@ impl Prover {
                     heuristic2search_send,
                 )
             });
-            */
 
             let result = search_task(
                 &mut self.search,
@@ -121,16 +119,14 @@ pub fn search_task(
         check_for_timeout(true);
 
         if let Ok((f, status)) = oracle_recv.try_recv() {
-            log::debug!("{:?}: {:?}", f, status);
             if status != Status::Unknown {
                 search.set_status(&f, status);
             }
         } else if let Ok((f, score)) = heuristic_recv.try_recv() {
-            log::debug!("{:?}: {:?}", f, score);
             search.set_score(&f, score);
         } else {
-            let fs = search.do_step();
-            for f in fs {
+            let new_formulae = search.do_step();
+            for f in new_formulae {
                 oracle_send.send(f.clone()).expect("send failed");
                 heuristic_send.send(f).expect("send failed");
             }

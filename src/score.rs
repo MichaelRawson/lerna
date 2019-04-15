@@ -1,21 +1,26 @@
 use std::cmp::Ordering;
 use std::fmt;
-use std::iter::Sum;
-use std::ops::Div;
+use std::ops::{AddAssign, Div};
 
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Score(pub f32);
 
-impl Score {
-    pub fn new(score: f32) -> Self {
+impl From<f32> for Score {
+    fn from(score: f32) -> Self {
         assert!(score.is_finite());
-        Score(score)
+        Self(score)
     }
 }
 
-impl Sum for Score {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        Score::new(iter.map(|s| s.0).sum())
+impl From<usize> for Score {
+    fn from(score: usize) -> Self {
+        (score as f32).into()
+    }
+}
+
+impl AddAssign for Score {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
     }
 }
 
@@ -23,7 +28,7 @@ impl Div for Score {
     type Output = Score;
 
     fn div(self, other: Self) -> Score {
-        Score::new(self.0 / other.0)
+        (self.0 / other.0).into()
     }
 }
 

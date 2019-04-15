@@ -8,6 +8,7 @@ pub struct Null;
 
 impl Heuristic for Null {
     fn score(&self, batch: &[Id<Formula>]) -> Vec<Score> {
-        batch.iter().map(|_| Score::new(0.5)).collect()
+        let score = 0.5.into();
+        batch.iter().map(|_| score).collect()
     }
 }
