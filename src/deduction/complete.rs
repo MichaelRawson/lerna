@@ -7,12 +7,6 @@ use crate::symbol::Symbol;
 
 use Formula::*;
 
-fn pairs<T>(set: &IdSet<T>) -> impl Iterator<Item = (&Id<T>, &Id<T>)> {
-    let lefts = set.into_iter();
-    let rights = set.into_iter().skip(1);
-    lefts.zip(rights)
-}
-
 fn introduced(f: &Id<Formula>) -> Id<Symbol> {
     Id::new(Symbol::Introduced(Id::id(f)))
 }
@@ -35,7 +29,7 @@ fn complete(
             Eq(ref ts) => {
                 if ts.len() > 2 {
                     deduced.insert(
-                        pairs(ts)
+                        ts.pairs()
                             .map(|(t, s)| {
                                 Id::new(Formula::Not(Id::new(Eq(idset![
                                     t.clone(),
@@ -66,7 +60,7 @@ fn complete(
             }
             Eqv(ref ps) => {
                 deduced.insert(
-                    pairs(ps)
+                    ps.pairs()
                         .flat_map(|(p, q)| {
                             std::iter::once((p, q))
                                 .chain(std::iter::once((q, p)))
@@ -131,7 +125,7 @@ fn complete(
             }
         }
         Eqv(ref ps) => {
-            for (p, q) in pairs(ps) {
+            for (p, q) in ps.pairs() {
                 let rest = Id::new(Eqv(ps.without(p)));
                 let positive =
                     Id::new(And(idset![rest.clone(), p.clone(), q.clone()]));

@@ -115,6 +115,12 @@ impl<T> IdSet<T> {
             .collect::<IdList<_>>();
         unsafe { Self::from_sorted_list(new) }
     }
+
+    pub fn pairs(&self) -> impl Iterator<Item = (&Id<T>, &Id<T>)> {
+        let lefts = self.into_iter();
+        let rights = self.into_iter().skip(1);
+        lefts.zip(rights)
+    }
 }
 
 impl<'a, T: 'a + Clone> IdSet<T> {

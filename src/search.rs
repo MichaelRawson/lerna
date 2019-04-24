@@ -70,6 +70,33 @@ impl Search {
         new_formulae
     }
 
+    pub fn proof(&self) -> HashSet<Id<Formula>> {
+        assert_eq!(self.status(), Status::Unsat);
+        let mut lemmas = HashSet::new();
+        self.proof_of(&self.root, &mut lemmas);
+        lemmas
+    }
+
+    fn proof_of(&self, f: &Id<Formula>, lemmas: &mut HashSet<Id<Formula>>) {
+        assert_eq!(self.node_status(f), Status::Unsat);
+        if let Some(children) = self.node(f).children.as_ref() {
+            let proved = children
+                .iter()
+                .find(|inference| {
+                    inference
+                        .into_iter()
+                        .all(|f| self.node_status(f) == Status::Unsat)
+                });
+            if let Some(inference) = proved {
+                for f in inference {
+                    self.proof_of(f, lemmas);
+                }
+                return;
+            }
+        }
+        lemmas.insert(f.clone());
+    }
+
     fn node(&self, f: &Id<Formula>) -> &Node {
         self.nodes.get(f).expect("node did not exist")
     }

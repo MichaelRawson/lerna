@@ -15,8 +15,8 @@ const BATCH_SIZE: usize = 128;
 const MAX_QUEUED: usize = 65536;
 
 pub struct Prover {
-    problem: Id<Formula>,
-    search: Search,
+    pub problem: Id<Formula>,
+    pub search: Search,
 }
 
 impl Prover {

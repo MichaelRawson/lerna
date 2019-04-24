@@ -3,18 +3,36 @@ use lazy_static::lazy_static;
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
-use crate::heuristic::null::Null;
 use crate::heuristic::Heuristic;
-use crate::oracle::z3::Z3;
 use crate::oracle::Oracle;
 
+pub enum Mode {
+    Baseline,
+    Prover,
+}
+
+impl FromStr for Mode {
+    type Err = ();
+
+    fn from_str(x: &str) -> Result<Self, Self::Err> {
+        use Mode::*;
+        match x {
+            "baseline" => Ok(Baseline),
+            "prover" => Ok(Prover),
+            _ => Err(()),
+        }
+    }
+}
+
 pub struct Options {
+    pub mode: Mode,
     pub file: String,
     pub start_time: SystemTime,
     pub time: Duration,
-    pub heuristic: Box<dyn Heuristic>,
-    pub oracle: Box<dyn Oracle>,
-    pub oracle_time: u16,
+    pub heuristic: Heuristic,
+    pub oracle: Oracle,
+    pub oracle_iterations: u64,
+    pub oracle_timeout: u16,
     pub quiet: bool,
     pub skepticism: f32,
 }
@@ -46,6 +64,15 @@ impl Options {
                     .index(1),
             )
             .arg(
+                Arg::with_name("mode")
+                    .help("Mode of operation")
+                    .long("mode")
+                    .takes_value(true)
+                    .value_name("MODE")
+                    .possible_values(&["baseline", "prover"])
+                    .default_value("prover"),
+            )
+            .arg(
                 Arg::with_name("time")
                     .help("Prover timeout")
                     .long("time")
@@ -61,9 +88,41 @@ impl Options {
                     .default_value("30"),
             )
             .arg(
-                Arg::with_name("oracle time")
+                Arg::with_name("heuristic")
+                    .help("Heuristic to use")
+                    .long("heuristic")
+                    .takes_value(true)
+                    .value_name("HEURISTIC")
+                    .possible_values(&["null"])
+                    .default_value("null"),
+            )
+            .arg(
+                Arg::with_name("oracle")
+                    .help("Oracle to use")
+                    .long("oracle")
+                    .takes_value(true)
+                    .value_name("ORACLE")
+                    .possible_values(&["null", "z3"])
+                    .default_value("z3"),
+            )
+            .arg(
+                Arg::with_name("oracle iterations")
+                    .help("Oracle maximum iterations")
+                    .long("oracle_iterations")
+                    .takes_value(true)
+                    .value_name("ITERATIONS")
+                    .validator(|x| {
+                        validate::<u64>(
+                            &x,
+                            "should be a positive number of iterations",
+                        )
+                    })
+                    .default_value("1000000"),
+            )
+            .arg(
+                Arg::with_name("oracle timeout")
                     .help("Oracle time limit")
-                    .long("oracle_time")
+                    .long("oracle_timeout")
                     .takes_value(true)
                     .value_name("MILLIS")
                     .validator(|x| {
@@ -94,20 +153,25 @@ impl Options {
             .get_matches();
 
         let file = get_validated_arg(&matches, "FILE");
+        let mode = get_validated_arg(&matches, "mode");
         let time = Duration::from_secs(get_validated_arg(&matches, "time"));
-        let heuristic = Box::new(Null);
-        let oracle = Box::new(Z3);
-        let oracle_time = get_validated_arg(&matches, "oracle time");
+        let heuristic = get_validated_arg(&matches, "heuristic");
+        let oracle = get_validated_arg(&matches, "oracle");
+        let oracle_iterations =
+            get_validated_arg(&matches, "oracle iterations");
+        let oracle_timeout = get_validated_arg(&matches, "oracle timeout");
         let skepticism = get_validated_arg(&matches, "skepticism");
         let quiet = matches.is_present("quiet");
 
         Options {
             file,
+            mode,
             start_time,
             time,
             heuristic,
             oracle,
-            oracle_time,
+            oracle_iterations,
+            oracle_timeout,
             skepticism,
             quiet,
         }

@@ -1,15 +1,35 @@
+use std::str::FromStr;
 use unique::Id;
 
 use crate::formula::Formula;
 use crate::options::OPTIONS;
 use crate::status::Status;
 
-pub mod z3;
+mod null;
+mod z3;
 
-pub trait Oracle: Sync + Send {
-    fn consult(&self, f: &Id<Formula>) -> Status;
+pub enum Oracle {
+    Null,
+    Z3,
+}
+
+impl FromStr for Oracle {
+    type Err = ();
+
+    fn from_str(x: &str) -> Result<Self, Self::Err> {
+        use Oracle::*;
+        match x {
+            "null" => Ok(Null),
+            "z3" => Ok(Z3),
+            _ => Err(()),
+        }
+    }
 }
 
 pub fn consult(f: &Id<Formula>) -> Status {
-    OPTIONS.oracle.consult(f)
+    use Oracle::*;
+    match OPTIONS.oracle {
+        Null => null::run(f),
+        Z3 => z3::run(f),
+    }
 }
