@@ -177,7 +177,7 @@ fn load_file(path: &Included, loading: &mut Loading) {
         log::error!("OS error: {}", e);
         os_error()
     });
-    check_for_timeout(true);
+    check_for_timeout();
 
     let bytes = &*match mapped {
         Some(bytes) => bytes,
@@ -185,7 +185,7 @@ fn load_file(path: &Included, loading: &mut Loading) {
     };
 
     for result in parse(bytes) {
-        check_for_timeout(true);
+        check_for_timeout();
         let statement = result.unwrap_or_else(|e| {
             let start = bytes.as_ptr() as usize;
             let position = e.position.as_ptr() as usize;

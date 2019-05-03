@@ -3,9 +3,18 @@ use std::ops::{Add, Mul};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Status {
-    Sat,
-    Unsat,
+    Sat = 0,
+    Unsat = 1,
     Unknown,
+}
+
+impl Status {
+    pub fn is_known(self) -> bool {
+        match self {
+            Sat | Unsat => true,
+            Unknown => false,
+        }
+    }
 }
 
 use Status::*;

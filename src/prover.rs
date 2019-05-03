@@ -5,11 +5,12 @@ use unique::Id;
 
 use crate::formula::Formula;
 use crate::heuristic::heuristic;
+use crate::options::OPTIONS;
 use crate::oracle::consult;
 use crate::score::Score;
 use crate::search::Search;
 use crate::status::Status;
-use crate::system::{check_for_timeout, os_error};
+use crate::system::{os_error, within_time};
 
 const BATCH_SIZE: usize = 128;
 const MAX_QUEUED: usize = 65536;
@@ -37,9 +38,16 @@ impl Prover {
 
         let running = AtomicBool::new(true);
         thread::scope(|s| {
-            s.spawn(|_| {
-                oracle_task(&running, search2oracle_receive, oracle2search_send)
-            });
+            for _ in 0..OPTIONS.oracle_threads {
+                s.spawn(|_| {
+                    oracle_task(
+                        &running,
+                        search2oracle_receive.clone(),
+                        oracle2search_send.clone(),
+                    )
+                });
+            }
+
             s.spawn(|_| {
                 heuristic_task(
                     &running,
@@ -65,13 +73,12 @@ impl Prover {
     }
 }
 
-pub fn oracle_task(
+fn oracle_task(
     running: &AtomicBool,
     oracle_in: Receiver<Id<Formula>>,
     oracle_out: Sender<(Id<Formula>, Status)>,
 ) {
     while running.load(Ordering::Relaxed) {
-        check_for_timeout(false);
         if let Ok(f) = oracle_in.try_recv() {
             let consultation = consult(&f);
             if oracle_out.send((f, consultation)).is_err() {
@@ -81,14 +88,12 @@ pub fn oracle_task(
     }
 }
 
-pub fn heuristic_task(
+fn heuristic_task(
     running: &AtomicBool,
     heuristic_in: Receiver<Id<Formula>>,
     heuristic_out: Sender<(Id<Formula>, Score)>,
 ) {
     while running.load(Ordering::Relaxed) {
-        check_for_timeout(true);
-
         let mut batch = vec![];
         while let Ok(f) = heuristic_in.try_recv() {
             batch.push(f);
@@ -115,20 +120,18 @@ pub fn search_task(
     heuristic_recv: Receiver<(Id<Formula>, Score)>,
     oracle_recv: Receiver<(Id<Formula>, Status)>,
 ) -> Status {
-    while search.status() == Status::Unknown {
-        check_for_timeout(true);
-
+    while !search.status().is_known() && within_time() {
         if let Ok((f, status)) = oracle_recv.try_recv() {
-            if status != Status::Unknown {
-                search.set_status(&f, status);
-            }
+            search.set_status(&f, status);
         } else if let Ok((f, score)) = heuristic_recv.try_recv() {
             search.set_score(&f, score);
         } else {
-            let new_formulae = search.do_step();
-            for f in new_formulae {
-                oracle_send.send(f.clone()).expect("send failed");
-                heuristic_send.send(f).expect("send failed");
+            let work = search.do_step();
+            if let Some(new_formulae) = work {
+                for f in new_formulae {
+                    oracle_send.send(f.clone()).expect("send failed");
+                    heuristic_send.send(f).expect("send failed");
+                }
             }
         }
     }

@@ -7,6 +7,7 @@ use crate::formula::Formula;
 use crate::options::OPTIONS;
 use crate::score::Score;
 use crate::status::Status;
+use crate::record::record;
 
 #[derive(Debug, Default)]
 pub struct Node {
@@ -26,7 +27,7 @@ fn uct(parent_visits: usize, child_visits: usize, score: Score) -> Score {
 
 pub struct Search {
     root: Id<Formula>,
-    pub nodes: HashMap<Id<Formula>, Node>,
+    nodes: HashMap<Id<Formula>, Node>,
 }
 
 impl Search {
@@ -42,59 +43,46 @@ impl Search {
         self.node(&self.root).status
     }
 
-    pub fn set_status(&mut self, f: &Id<Formula>, status: Status) {
-        self.node_mut(f).status = status;
-        self.propagate_status(f);
+    pub fn set_status(&mut self, f: &Id<Formula>, new_status: Status) {
+        let old_status = self.node_status(f);
+        if !old_status.is_known() && old_status != new_status {
+            record(f, new_status);
+            self.node_mut(f).status = new_status;
+            self.propagate_status(f);
+        }
     }
 
     pub fn set_score(&mut self, f: &Id<Formula>, score: Score) {
-        self.node_mut(f).score = score;
-        self.propagate_score(f)
+        if !self.node_status(f).is_known() {
+            self.node_mut(f).score = score;
+            self.propagate_score(f)
+        }
     }
 
-    pub fn do_step(&mut self) -> HashSet<Id<Formula>> {
-        assert_eq!(self.status(), Status::Unknown);
+    pub fn do_step(&mut self) -> Option<HashSet<Id<Formula>>> {
+        assert!(!self.status().is_known());
 
-        let leaf = self.select();
-        assert_eq!(self.node_status(&leaf), Status::Unknown);
+        let leaf = self.select()?;
+
+        assert!(!self.node_status(&leaf).is_known());
 
         let mut ancestors: HashSet<_> =
             self.ancestors_of(&leaf).into_iter().collect();
         ancestors.insert(leaf.clone());
         let new_formulae = self.expand(&leaf, &ancestors);
 
-        if self.node_status(&leaf) != Status::Unknown {
+        if self.node_status(&leaf).is_known() {
             self.propagate_status(&leaf);
         }
 
-        new_formulae
+        Some(new_formulae)
     }
 
-    pub fn proof(&self) -> HashSet<Id<Formula>> {
+    pub fn proof(&self) -> Vec<Id<Formula>> {
         assert_eq!(self.status(), Status::Unsat);
-        let mut lemmas = HashSet::new();
-        self.proof_of(&self.root, &mut lemmas);
-        lemmas
-    }
-
-    fn proof_of(&self, f: &Id<Formula>, lemmas: &mut HashSet<Id<Formula>>) {
-        assert_eq!(self.node_status(f), Status::Unsat);
-        if let Some(children) = self.node(f).children.as_ref() {
-            let proved = children
-                .iter()
-                .find(|inference| {
-                    inference
-                        .into_iter()
-                        .all(|f| self.node_status(f) == Status::Unsat)
-                });
-            if let Some(inference) = proved {
-                for f in inference {
-                    self.proof_of(f, lemmas);
-                }
-                return;
-            }
-        }
-        lemmas.insert(f.clone());
+        let mut log = vec![];
+        self.proof_of(&self.root, &mut log);
+        log
     }
 
     fn node(&self, f: &Id<Formula>) -> &Node {
@@ -151,6 +139,23 @@ impl Search {
         ancestors
     }
 
+    fn proof_of(&self, f: &Id<Formula>, log: &mut Vec<Id<Formula>>) {
+        assert_eq!(self.node_status(f), Status::Unsat);
+        log.push(f.clone());
+        if let Some(children) = self.node(f).children.as_ref() {
+            let proved = children.iter().find(|inference| {
+                inference
+                    .into_iter()
+                    .all(|f| self.node_status(f) == Status::Unsat)
+            });
+            if let Some(inference) = proved {
+                for f in inference {
+                    self.proof_of(f, log);
+                }
+            }
+        }
+    }
+
     fn computed_status(&self, f: &Id<Formula>) -> Status {
         if *f == Id::new(Formula::F) {
             Status::Unsat
@@ -166,7 +171,12 @@ impl Search {
 
     fn propagate_status(&mut self, start: &Id<Formula>) {
         for f in self.ancestors_of(start) {
-            self.node_mut(&f).status = self.computed_status(&f);
+            let old_status = self.node(&f).status;
+            let new_status = self.computed_status(&f);
+            if new_status.is_known() && old_status != new_status {
+                record(&f, new_status);
+                self.node_mut(&f).status = new_status;
+            }
         }
     }
 
@@ -203,7 +213,7 @@ impl Search {
         }
     }
 
-    fn select(&mut self) -> Id<Formula> {
+    fn select(&mut self) -> Option<Id<Formula>> {
         let mut current = self.root.clone();
 
         while self.node(&current).children.is_some() {
@@ -216,26 +226,21 @@ impl Search {
                     .into_iter()
                     .any(|f| self.node_status(f) == Status::Sat)
             });
-            let selected_inference = possible
-                .max_by_key(|inference| {
-                    let score = inference
-                        .into_iter()
-                        .map(|f| self.node_score(f))
-                        .min()
-                        .expect("inference had no children");
-                    let child_visits = inference
-                        .into_iter()
-                        .map(|f| self.node_visits(f))
-                        .sum();
-                    uct(parent_visits, child_visits, score)
-                })
-                .expect("no possible inferences");
+            let selected_inference = possible.max_by_key(|inference| {
+                let score = inference
+                    .into_iter()
+                    .map(|f| self.node_score(f))
+                    .min()
+                    .expect("inference had no children");
+                let child_visits =
+                    inference.into_iter().map(|f| self.node_visits(f)).sum();
+                uct(parent_visits, child_visits, score)
+            })?;
             let possible_formulae = selected_inference
                 .into_iter()
-                .filter(|f| self.node_status(f) != Status::Unsat);
+                .filter(|f| !self.node_status(f).is_known());
             let selected = possible_formulae
-                .min_by_key(|f| self.node_score(f))
-                .expect("inference had no possible children")
+                .min_by_key(|f| self.node_score(f))?
                 .clone();
 
             self.node_mut(&current).visits += 1;
@@ -243,7 +248,7 @@ impl Search {
         }
 
         self.node_mut(&current).visits += 1;
-        current
+        Some(current)
     }
 
     fn expand(

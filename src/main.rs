@@ -3,6 +3,7 @@ mod collections;
 
 mod deduction;
 mod formula;
+mod graph;
 mod heuristic;
 mod input;
 mod logging;
@@ -10,6 +11,7 @@ mod options;
 mod oracle;
 mod output;
 mod prover;
+mod record;
 mod score;
 mod search;
 mod simplification;
@@ -18,7 +20,6 @@ mod symbol;
 mod system;
 mod term;
 
-use std::collections::HashSet;
 use unique::Id;
 
 use crate::formula::Formula;
@@ -28,25 +29,25 @@ use crate::oracle::consult;
 use crate::prover::Prover;
 use crate::simplification::simplify;
 use crate::status::Status;
-use crate::system::{check_for_timeout, gave_up, satisfiable, unsatisfiable};
+use crate::system::{
+    check_for_timeout, gave_up, satisfiable, time_out, unsatisfiable,
+};
 
 fn run_baseline(simplified: Id<Formula>) {
-    log::info!("running oracle in baseline mode...");
+    log::info!("running oracle...");
 
     use Status::*;
     match consult(&simplified) {
         Sat => {
-            log::info!("...oracle found problem satisfiable");
+            log::info!("...problem satisfiable");
             satisfiable()
         }
         Unsat => {
-            log::info!("...oracle found problem unsatisfiable");
-            let mut lemmas = HashSet::new();
-            lemmas.insert(simplified.clone());
-            unsatisfiable(lemmas)
+            log::info!("...problem unsatisfiable");
+            unsatisfiable(vec![simplified.clone()])
         }
         Unknown => {
-            log::info!("...oracle gave up");
+            log::info!("...gave up");
             gave_up()
         }
     }
@@ -59,28 +60,29 @@ fn run_prover(simplified: Id<Formula>) {
     use Status::*;
     match prover.run() {
         Sat => {
-            log::info!("...prover found problem satisfiable");
+            log::info!("...problem satisfiable");
             satisfiable()
         }
         Unsat => {
-            log::info!(
-                "...prover found problem unsatisfiable, printing lemmas"
-            );
+            log::info!("...problem unsatisfiable");
             let lemmas = prover.search.proof();
             unsatisfiable(lemmas)
         }
-        _ => unreachable!(),
+        Unknown => {
+            log::info!("...time out");
+            time_out()
+        }
     }
 }
 
 fn main() {
     options::initialize();
     logging::initialize();
-    check_for_timeout(true);
+    check_for_timeout();
 
     let loaded = load();
     let simplified = simplify(&loaded.goal);
-    check_for_timeout(true);
+    check_for_timeout();
 
     use Mode::*;
     match OPTIONS.mode {

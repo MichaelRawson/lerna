@@ -93,19 +93,14 @@ fn formula(f: &Id<Formula>, bound: usize) -> FofFormula {
     }
 }
 
-fn lemma_name(f: &Id<Formula>) -> Name {
-    Name::LowerWord(Cow::Owned(format!("lemma_{:x}", Id::id(f))))
+fn statement_name(f: &Id<Formula>) -> Name {
+    Name::LowerWord(Cow::Owned(format!("f{:x}", Id::id(f))))
 }
 
-fn lemma(f: &Id<Formula>) -> Statement {
-    Statement::Fof(
-        lemma_name(f),
-        FormulaRole::Lemma,
-        FofFormula::Unary(UnaryConnective::Not, Box::new(formula(f, 0))),
-        None,
-    )
+fn statement(f: &Id<Formula>) -> Statement {
+    Statement::Fof(statement_name(f), FormulaRole::Plain, formula(f, 0), None)
 }
 
-pub fn write_lemma<W: Write>(w: &mut W, f: &Id<Formula>) -> io::Result<()> {
-    writeln!(w, "{}", lemma(f))
+pub fn write_statement<W: Write>(w: &mut W, f: &Id<Formula>) -> io::Result<()> {
+    writeln!(w, "{}", statement(f))
 }
