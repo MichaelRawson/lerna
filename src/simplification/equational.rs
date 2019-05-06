@@ -7,7 +7,7 @@ use Formula::*;
 fn trivial_equality(f: &Id<Formula>) -> Id<Formula> {
     match **f {
         Eq(ref ts) => {
-            if ts.len() == 1 {
+            if ts.len() <= 1 {
                 Id::new(T)
             } else {
                 f.clone()
@@ -61,7 +61,7 @@ fn rewrite_classes(f: &Id<Formula>) -> Id<Formula> {
                 let mut p = p.clone();
                 for (minimum, class) in &classes {
                     for term in *class {
-                        p = Formula::replace(&f, term, minimum);
+                        p = Formula::replace(&p, term, minimum);
                     }
                 }
                 p

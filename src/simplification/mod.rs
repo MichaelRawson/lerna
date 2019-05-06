@@ -4,6 +4,7 @@ mod equational;
 use unique::Id;
 
 use crate::formula::Formula;
+use crate::system::check_for_timeout;
 
 fn simplify_children(f: &Id<Formula>) -> Id<Formula> {
     use Formula::*;
@@ -30,6 +31,7 @@ pub fn simplify(f: &Id<Formula>) -> Id<Formula> {
 
     loop {
         let simplified = simplify_step(&f);
+        check_for_timeout();
         if f == simplified {
             return f;
         }

@@ -170,7 +170,7 @@ fn trivial_nary(f: &Id<Formula>) -> Id<Formula> {
             }
         }
         Eqv(ref ps) => {
-            if ps.len() == 1 {
+            if ps.len() <= 1 {
                 Id::new(T)
             } else {
                 f.clone()
