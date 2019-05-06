@@ -126,12 +126,10 @@ pub fn search_task(
         } else if let Ok((f, score)) = heuristic_recv.try_recv() {
             search.set_score(&f, score);
         } else {
-            let work = search.do_step();
-            if let Some(new_formulae) = work {
-                for f in new_formulae {
-                    oracle_send.send(f.clone()).expect("send failed");
-                    heuristic_send.send(f).expect("send failed");
-                }
+            let new_formulae = search.do_step();
+            for f in new_formulae {
+                oracle_send.send(f.clone()).expect("send failed");
+                heuristic_send.send(f).expect("send failed");
             }
         }
     }

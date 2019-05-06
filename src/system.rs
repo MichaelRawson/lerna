@@ -54,12 +54,6 @@ pub fn unsatisfiable(lemmas: Vec<Id<Formula>>) -> ! {
     exit(0)
 }
 
-pub fn gave_up() -> ! {
-    println!();
-    println!("% SZS status GaveUp for {}", logical_data_id());
-    exit(1)
-}
-
 pub fn check_for_timeout() {
     if !within_time() {
         time_out()

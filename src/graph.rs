@@ -46,7 +46,7 @@ fn from_term(t: &Id<Term>, bound: &[usize]) -> Rc<Node> {
         Fn(ref c, ref ts) if ts.is_empty() => Node {
             flavour: Constant,
             data: Some(Id::id(c)),
-            children: vec![]
+            children: vec![],
         },
         Fn(ref f, ref ts) => Node {
             flavour: Application,
@@ -60,9 +60,12 @@ fn from_term(t: &Id<Term>, bound: &[usize]) -> Rc<Node> {
                 Rc::new(Node {
                     flavour: Arguments,
                     data: None,
-                    children: ts.into_iter().map(|t| from_term(t, bound)).collect()
-                })
-            ]
+                    children: ts
+                        .into_iter()
+                        .map(|t| from_term(t, bound))
+                        .collect(),
+                }),
+            ],
         },
     })
 }
@@ -75,12 +78,12 @@ fn from_formula(f: &Id<Formula>, bound: &mut Vec<usize>) -> Rc<Node> {
         T => Node {
             flavour: True,
             data: None,
-            children: vec![]
+            children: vec![],
         },
         F => Node {
             flavour: False,
             data: None,
-            children: vec![]
+            children: vec![],
         },
         Eq(ref ps) => Node {
             flavour: Equality,
@@ -90,7 +93,7 @@ fn from_formula(f: &Id<Formula>, bound: &mut Vec<usize>) -> Rc<Node> {
         Prd(ref p, ref ts) if ts.is_empty() => Node {
             flavour: Proposition,
             data: Some(Id::id(p)),
-            children: vec![]
+            children: vec![],
         },
         Prd(ref p, ref ts) => Node {
             flavour: Application,
@@ -104,9 +107,12 @@ fn from_formula(f: &Id<Formula>, bound: &mut Vec<usize>) -> Rc<Node> {
                 Rc::new(Node {
                     flavour: Arguments,
                     data: None,
-                    children: ts.into_iter().map(|t| from_term(t, bound)).collect()
-                })
-            ]
+                    children: ts
+                        .into_iter()
+                        .map(|t| from_term(t, bound))
+                        .collect(),
+                }),
+            ],
         },
         Not(ref p) => Node {
             flavour: Negation,

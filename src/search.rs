@@ -5,9 +5,9 @@ use crate::collections::IdSet;
 use crate::deduction::deductions;
 use crate::formula::Formula;
 use crate::options::OPTIONS;
+use crate::record::record;
 use crate::score::Score;
 use crate::status::Status;
-use crate::record::record;
 
 #[derive(Debug, Default)]
 pub struct Node {
@@ -59,11 +59,9 @@ impl Search {
         }
     }
 
-    pub fn do_step(&mut self) -> Option<HashSet<Id<Formula>>> {
+    pub fn do_step(&mut self) -> HashSet<Id<Formula>> {
         assert!(!self.status().is_known());
-
-        let leaf = self.select()?;
-
+        let leaf = self.select();
         assert!(!self.node_status(&leaf).is_known());
 
         let mut ancestors: HashSet<_> =
@@ -75,7 +73,7 @@ impl Search {
             self.propagate_status(&leaf);
         }
 
-        Some(new_formulae)
+        new_formulae
     }
 
     pub fn proof(&self) -> Vec<Id<Formula>> {
@@ -213,7 +211,7 @@ impl Search {
         }
     }
 
-    fn select(&mut self) -> Option<Id<Formula>> {
+    fn select(&mut self) -> Id<Formula> {
         let mut current = self.root.clone();
 
         while self.node(&current).children.is_some() {
@@ -235,12 +233,13 @@ impl Search {
                 let child_visits =
                     inference.into_iter().map(|f| self.node_visits(f)).sum();
                 uct(parent_visits, child_visits, score)
-            })?;
+            }).expect("no valid inferences");
             let possible_formulae = selected_inference
                 .into_iter()
                 .filter(|f| !self.node_status(f).is_known());
             let selected = possible_formulae
-                .min_by_key(|f| self.node_score(f))?
+                .min_by_key(|f| self.node_score(f))
+                .expect("inference had no children")
                 .clone();
 
             self.node_mut(&current).visits += 1;
@@ -248,7 +247,7 @@ impl Search {
         }
 
         self.node_mut(&current).visits += 1;
-        Some(current)
+        current
     }
 
     fn expand(

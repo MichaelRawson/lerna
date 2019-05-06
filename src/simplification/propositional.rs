@@ -93,18 +93,9 @@ fn contradiction(f: &Id<Formula>) -> Id<Formula> {
     }
 }
 
-fn combine_equivalence_classes(f: &Id<Formula>) -> Id<Formula> {
+fn combine_equivalences(f: &Id<Formula>) -> Id<Formula> {
     match **f {
         And(ref ps) => {
-            let eqs =
-                IdSet::combine_overlapping(ps.into_iter().filter_map(|f| {
-                    match **f {
-                        Eq(ref ts) => Some(ts),
-                        _ => None,
-                    }
-                }))
-                .into_iter()
-                .map(|class| Id::new(Eq(class)));
             let eqvs =
                 IdSet::combine_overlapping(ps.into_iter().filter_map(|f| {
                     match **f {
@@ -115,12 +106,12 @@ fn combine_equivalence_classes(f: &Id<Formula>) -> Id<Formula> {
                 .into_iter()
                 .map(|class| Id::new(Eqv(class)));
 
-            let neither = ps.into_iter().filter_map(|f| match **f {
-                Eq(_) | Eqv(_) => None,
+            let rest = ps.into_iter().filter_map(|f| match **f {
+                Eqv(_) => None,
                 _ => Some(f.clone()),
             });
 
-            Id::new(And(eqs.chain(eqvs).chain(neither).collect()))
+            Id::new(And(eqvs.chain(rest).collect()))
         }
         _ => f.clone(),
     }
@@ -160,13 +151,6 @@ fn double_negation(f: &Id<Formula>) -> Id<Formula> {
 
 fn trivial_nary(f: &Id<Formula>) -> Id<Formula> {
     match **f {
-        Eq(ref ts) => {
-            if ts.len() < 2 {
-                Id::new(T)
-            } else {
-                f.clone()
-            }
-        }
         And(ref ps) => {
             if ps.is_empty() {
                 Id::new(T)
@@ -186,7 +170,7 @@ fn trivial_nary(f: &Id<Formula>) -> Id<Formula> {
             }
         }
         Eqv(ref ps) => {
-            if ps.len() < 2 {
+            if ps.len() == 1 {
                 Id::new(T)
             } else {
                 f.clone()
@@ -231,7 +215,7 @@ fn lift_associative(f: &Id<Formula>) -> Id<Formula> {
 pub fn simplify_propositional(f: &Id<Formula>) -> Id<Formula> {
     let f = boolean_propagation(f);
     let f = contradiction(&f);
-    let f = combine_equivalence_classes(&f);
+    let f = combine_equivalences(&f);
     let f = combine_implications(&f);
     let f = double_negation(&f);
     let f = lift_associative(&f);

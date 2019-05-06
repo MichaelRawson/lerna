@@ -1,4 +1,5 @@
 mod propositional;
+mod equational;
 
 use unique::Id;
 
@@ -20,18 +21,18 @@ fn simplify_children(f: &Id<Formula>) -> Id<Formula> {
 
 fn simplify_step(f: &Id<Formula>) -> Id<Formula> {
     let f = simplify_children(f);
-    propositional::simplify_propositional(&f)
+    let f = propositional::simplify_propositional(&f);
+    equational::simplify_equational(&f)
 }
 
 pub fn simplify(f: &Id<Formula>) -> Id<Formula> {
     let mut f = f.clone();
-    let mut fresh = true;
 
-    while fresh {
+    loop {
         let simplified = simplify_step(&f);
-        fresh = simplified != f;
+        if f == simplified {
+            return f;
+        }
         f = simplified;
     }
-
-    f
 }

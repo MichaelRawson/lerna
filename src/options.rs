@@ -173,7 +173,7 @@ impl Options {
                     .long("record_file")
                     .takes_value(true)
                     .value_name("RECORD_FILE")
-                    .help("Record subgoal outcomes to RECORD_FILE")
+                    .help("Record subgoal outcomes to RECORD_FILE"),
             )
             .get_matches();
 

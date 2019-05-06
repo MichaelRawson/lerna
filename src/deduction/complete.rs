@@ -100,29 +100,6 @@ fn complete(
                     deduced.insert(combined);
                 }
             }
-
-            let classes = ps
-                .into_iter()
-                .filter_map(|f| match **f {
-                    Eq(ref ts) => Some((f, ts.as_ref())),
-                    _ => None,
-                })
-                .map(|(p, class)| (p, &class[0], &class[1..]));
-            for (p, minimum, class) in classes {
-                let rest = ps
-                    .without(p)
-                    .into_iter()
-                    .map(|f| {
-                        let mut f = f;
-                        for t in class {
-                            f = Formula::replace(&f, t, minimum);
-                        }
-                        f
-                    })
-                    .chain(std::iter::once(p.clone()))
-                    .collect();
-                deduced.insert(idset![Id::new(And(rest))]);
-            }
         }
         Eqv(ref ps) => {
             for (p, q) in ps.pairs() {
@@ -138,10 +115,7 @@ fn complete(
             }
         }
         All(ref p) => {
-            let intro = introduced(p);
-            for (symbol, arity) in
-                symbols.iter().chain(std::iter::once(&(&intro, 0)))
-            {
+            for (symbol, arity) in symbols {
                 let mut instantiated = Formula::subst(p, 0, symbol, *arity);
                 for _ in 0..*arity {
                     instantiated = Id::new(All(instantiated))
@@ -149,6 +123,9 @@ fn complete(
                 let combined = Id::new(And(idset![f.clone(), instantiated]));
                 deduced.insert(idset![combined]);
             }
+            let intro = introduced(p);
+            let instantiated = Formula::subst(p, 0, &intro, 0);
+            deduced.insert(idset![instantiated]);
         }
         Ex(ref p) => {
             let intro = introduced(p);

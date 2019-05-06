@@ -29,9 +29,7 @@ use crate::oracle::consult;
 use crate::prover::Prover;
 use crate::simplification::simplify;
 use crate::status::Status;
-use crate::system::{
-    check_for_timeout, gave_up, satisfiable, time_out, unsatisfiable,
-};
+use crate::system::{check_for_timeout, satisfiable, time_out, unsatisfiable};
 
 fn run_baseline(simplified: Id<Formula>) {
     log::info!("running oracle...");
@@ -47,8 +45,8 @@ fn run_baseline(simplified: Id<Formula>) {
             unsatisfiable(vec![simplified.clone()])
         }
         Unknown => {
-            log::info!("...gave up");
-            gave_up()
+            log::info!("...time out");
+            time_out()
         }
     }
 }
