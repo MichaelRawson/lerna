@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use unique::Id;
 
 use crate::formula::Formula;
-use crate::heuristic::heuristic;
+use crate::heuristic::{deque_heuristic, enqueue_heuristic};
 use crate::options::OPTIONS;
 use crate::oracle::consult;
 use crate::score::Score;
@@ -12,7 +12,6 @@ use crate::search::Search;
 use crate::status::Status;
 use crate::system::{os_error, within_time};
 
-const BATCH_SIZE: usize = 128;
 const MAX_QUEUED: usize = 65536;
 
 pub struct Prover {
@@ -48,13 +47,9 @@ impl Prover {
                 });
             }
 
-            s.spawn(|_| {
-                heuristic_task(
-                    &running,
-                    search2heuristic_receive,
-                    heuristic2search_send,
-                )
-            });
+            s.spawn(|_| heuristic_in_task(&running, search2heuristic_receive));
+
+            s.spawn(|_| heuristic_out_task(&running, heuristic2search_send));
 
             let result = search_task(
                 &mut self.search,
@@ -88,6 +83,30 @@ fn oracle_task(
     }
 }
 
+fn heuristic_in_task(
+    running: &AtomicBool,
+    heuristic_in: Receiver<Id<Formula>>,
+) {
+    while running.load(Ordering::Relaxed) {
+        while let Ok(f) = heuristic_in.try_recv() {
+            enqueue_heuristic(&f)
+        }
+    }
+}
+
+fn heuristic_out_task(
+    running: &AtomicBool,
+    heuristic_out: Sender<(Id<Formula>, Score)>,
+) {
+    while running.load(Ordering::Relaxed) {
+        let scored = deque_heuristic();
+        if heuristic_out.send(scored).is_err() {
+            return;
+        }
+    }
+}
+
+/*
 fn heuristic_task(
     running: &AtomicBool,
     heuristic_in: Receiver<Id<Formula>>,
@@ -112,6 +131,7 @@ fn heuristic_task(
         }
     }
 }
+*/
 
 pub fn search_task(
     search: &mut Search,

@@ -1,10 +1,11 @@
 use clap::{App, Arg, ArgMatches};
 use lazy_static::lazy_static;
 use std::fs::{File, OpenOptions};
+use std::io::BufReader;
 use std::str::FromStr;
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
-use crate::heuristic::Heuristic;
 use crate::oracle::Oracle;
 use crate::system::os_error;
 
@@ -31,13 +32,14 @@ pub struct Options {
     pub file: String,
     pub start_time: SystemTime,
     pub time: Duration,
-    pub heuristic: Heuristic,
     pub oracle: Oracle,
     pub oracle_threads: u16,
     pub oracle_iterations: u64,
     pub oracle_timeout: u16,
     pub quiet: bool,
     pub record_file: Option<File>,
+    pub heuristic_file_in: Option<File>,
+    pub heuristic_file_out: Option<Mutex<BufReader<File>>>,
     pub skepticism: f32,
 }
 
@@ -90,15 +92,6 @@ impl Options {
                         )
                     })
                     .default_value("30"),
-            )
-            .arg(
-                Arg::with_name("heuristic")
-                    .help("Heuristic to use")
-                    .long("heuristic")
-                    .takes_value(true)
-                    .value_name("HEURISTIC")
-                    .possible_values(&["null"])
-                    .default_value("null"),
             )
             .arg(
                 Arg::with_name("oracle")
@@ -169,6 +162,11 @@ impl Options {
                     .help("Turns off logging, except errors"),
             )
             .arg(
+                Arg::with_name("disable heuristic")
+                    .long("disable_heuristic")
+                    .help("Turns off heuristic communications"),
+            )
+            .arg(
                 Arg::with_name("record file")
                     .long("record_file")
                     .takes_value(true)
@@ -180,7 +178,6 @@ impl Options {
         let file = get_validated_arg(&matches, "FILE");
         let mode = get_validated_arg(&matches, "mode");
         let time = Duration::from_secs(get_validated_arg(&matches, "time"));
-        let heuristic = get_validated_arg(&matches, "heuristic");
         let oracle = get_validated_arg(&matches, "oracle");
         let oracle_threads = get_validated_arg(&matches, "oracle threads");
         let oracle_iterations =
@@ -188,6 +185,26 @@ impl Options {
         let oracle_timeout = get_validated_arg(&matches, "oracle timeout");
         let skepticism = get_validated_arg(&matches, "skepticism");
         let quiet = matches.is_present("quiet");
+        let (heuristic_file_in, heuristic_file_out) =
+            if matches.is_present("disable heuristic") {
+                (None, None)
+            } else {
+                let heuristic_in = OpenOptions::new()
+                    .append(true)
+                    .open("/tmp/lerna-heuristic-in")
+                    .unwrap_or_else(|e| {
+                        log::error!("failed to open heuristic file: {}", e);
+                        os_error()
+                    });
+                let heuristic_out = Mutex::new(BufReader::new(OpenOptions::new()
+                    .read(true)
+                    .open("/tmp/lerna-heuristic-out")
+                    .unwrap_or_else(|e| {
+                        log::error!("failed to open heuristic file: {}", e);
+                        os_error()
+                    })));
+                (Some(heuristic_in), Some(heuristic_out))
+            };
         let record_file = matches.value_of("record file").map(|path| {
             OpenOptions::new()
                 .append(true)
@@ -204,12 +221,13 @@ impl Options {
             mode,
             start_time,
             time,
-            heuristic,
             oracle,
             oracle_threads,
             oracle_iterations,
             oracle_timeout,
             skepticism,
+            heuristic_file_in,
+            heuristic_file_out,
             record_file,
             quiet,
         }

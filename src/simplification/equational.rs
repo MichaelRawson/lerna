@@ -12,8 +12,8 @@ fn trivial_equality(f: &Id<Formula>) -> Id<Formula> {
             } else {
                 f.clone()
             }
-        },
-        _ => f.clone()
+        }
+        _ => f.clone(),
     }
 }
 
@@ -36,8 +36,8 @@ fn combine_equations(f: &Id<Formula>) -> Id<Formula> {
             });
 
             Id::new(And(eqs.chain(rest).collect()))
-        },
-        _ => f.clone()
+        }
+        _ => f.clone(),
     }
 }
 
@@ -53,24 +53,26 @@ fn rewrite_classes(f: &Id<Formula>) -> Id<Formula> {
                 .map(|class| (&class[0], &class[1..]))
                 .collect();
 
-            Id::new(And(ps.into_iter().map(|p| {
-                if let Eq(_) = **p {
-                    return p.clone()
-                }
-
-                let mut p = p.clone();
-                for (minimum, class) in &classes {
-                    for term in *class {
-                        p = Formula::replace(&p, term, minimum);
+            Id::new(And(ps
+                .into_iter()
+                .map(|p| {
+                    if let Eq(_) = **p {
+                        return p.clone();
                     }
-                }
-                p
-            }).collect()))
-        },
-        _ => f.clone()
+
+                    let mut p = p.clone();
+                    for (minimum, class) in &classes {
+                        for term in *class {
+                            p = Formula::replace(&p, term, minimum);
+                        }
+                    }
+                    p
+                })
+                .collect()))
+        }
+        _ => f.clone(),
     }
 }
- 
 
 pub fn simplify_equational(f: &Id<Formula>) -> Id<Formula> {
     let f = trivial_equality(f);

@@ -224,16 +224,20 @@ impl Search {
                     .into_iter()
                     .any(|f| self.node_status(f) == Status::Sat)
             });
-            let selected_inference = possible.max_by_key(|inference| {
-                let score = inference
-                    .into_iter()
-                    .map(|f| self.node_score(f))
-                    .min()
-                    .expect("inference had no children");
-                let child_visits =
-                    inference.into_iter().map(|f| self.node_visits(f)).sum();
-                uct(parent_visits, child_visits, score)
-            }).expect("no valid inferences");
+            let selected_inference = possible
+                .max_by_key(|inference| {
+                    let score = inference
+                        .into_iter()
+                        .map(|f| self.node_score(f))
+                        .min()
+                        .expect("inference had no children");
+                    let child_visits = inference
+                        .into_iter()
+                        .map(|f| self.node_visits(f))
+                        .sum();
+                    uct(parent_visits, child_visits, score)
+                })
+                .expect("no valid inferences");
             let possible_formulae = selected_inference
                 .into_iter()
                 .filter(|f| !self.node_status(f).is_known());

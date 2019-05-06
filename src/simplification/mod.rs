@@ -1,5 +1,5 @@
-mod propositional;
 mod equational;
+mod propositional;
 
 use unique::Id;
 

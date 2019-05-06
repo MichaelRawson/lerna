@@ -22,9 +22,12 @@ pub fn record(f: &Id<Formula>, status: Status) {
         let y = status as u8;
         let record = Record { nodes, edges, y };
         to_writer(file, &record).unwrap_or_else(|e| {
-            log::error!("failed to write to record file: {}", e);
+            log::error!("failed to write data to record file: {}", e);
             os_error();
         });
-        file.write_all(b"\n").expect("failed to write newline?!");
+        writeln!(file).unwrap_or_else(|e| {
+            log::error!("failed to write newline to record file: {}", e);
+            os_error();
+        });
     }
 }
