@@ -1,13 +1,9 @@
 use clap::{App, Arg, ArgMatches};
 use lazy_static::lazy_static;
-use std::fs::{File, OpenOptions};
-use std::io::BufReader;
 use std::str::FromStr;
-use std::sync::Mutex;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use crate::oracle::Oracle;
-use crate::system::os_error;
 
 pub enum Mode {
     Baseline,
@@ -28,19 +24,22 @@ impl FromStr for Mode {
 }
 
 pub struct Options {
-    pub mode: Mode,
+    // global options
+    pub exploration: f32,
     pub file: String,
-    pub start_time: SystemTime,
+    pub mode: Mode,
     pub time: Duration,
+    pub quiet: bool,
+    // oracle options
     pub oracle: Oracle,
     pub oracle_threads: u16,
     pub oracle_iterations: u64,
     pub oracle_timeout: u16,
-    pub quiet: bool,
-    pub record_file: Option<File>,
-    pub heuristic_file_in: Option<File>,
-    pub heuristic_file_out: Option<Mutex<BufReader<File>>>,
-    pub skepticism: f32,
+    //heuristic options
+    pub heuristic_address: String,
+    pub heuristic_off: bool,
+    // record options
+    pub record_file: Option<String>,
 }
 
 fn validate<T: FromStr>(arg: &str, error: &str) -> Result<(), String> {
@@ -57,8 +56,6 @@ fn get_validated_arg<T: FromStr>(matches: &ArgMatches, name: &str) -> T {
 
 impl Options {
     fn new() -> Self {
-        let start_time = SystemTime::now();
-
         let matches = App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
             .author(env!("CARGO_PKG_AUTHORS"))
@@ -68,6 +65,17 @@ impl Options {
                     .help("the input problem")
                     .required(true)
                     .index(1),
+            )
+            .arg(
+                Arg::with_name("exploration")
+                    .help("Exploration constant: higher values give broader search")
+                    .long("exploration")
+                    .takes_value(true)
+                    .value_name("C")
+                    .validator(|x| {
+                        validate::<f32>(&x, "should be a floating-point number")
+                    })
+                    .default_value("1.4142"),
             )
             .arg(
                 Arg::with_name("mode")
@@ -92,6 +100,12 @@ impl Options {
                         )
                     })
                     .default_value("30"),
+            )
+            .arg(
+                Arg::with_name("quiet")
+                    .short("q")
+                    .long("quiet")
+                    .help("Turns off logging, except errors"),
             )
             .arg(
                 Arg::with_name("oracle")
@@ -145,91 +159,59 @@ impl Options {
                     .default_value("20"),
             )
             .arg(
-                Arg::with_name("skepticism")
-                    .help("Exploitation constant")
-                    .long("skepticism")
+                Arg::with_name("heuristic address")
+                    .help("heuristic IP address/port number")
+                    .short("a")
+                    .long("heuristic_address")
                     .takes_value(true)
-                    .value_name("C")
-                    .validator(|x| {
-                        validate::<f32>(&x, "should be a floating-point number")
-                    })
-                    .default_value("2"),
+                    .value_name("ADDR:PORT")
+                    .default_value("localhost:1337"),
             )
             .arg(
-                Arg::with_name("quiet")
-                    .short("q")
-                    .long("quiet")
-                    .help("Turns off logging, except errors"),
-            )
-            .arg(
-                Arg::with_name("disable heuristic")
-                    .long("disable_heuristic")
-                    .help("Turns off heuristic communications"),
+                Arg::with_name("heuristic off")
+                    .help("Turns off heuristic")
+                    .long("heuristic_off"),
             )
             .arg(
                 Arg::with_name("record file")
+                    .help("Record subgoal outcomes to RECORD_FILE")
                     .long("record_file")
                     .takes_value(true)
-                    .value_name("RECORD_FILE")
-                    .help("Record subgoal outcomes to RECORD_FILE"),
+                    .value_name("RECORD_FILE"),
             )
             .get_matches();
 
         let file = get_validated_arg(&matches, "FILE");
         let mode = get_validated_arg(&matches, "mode");
         let time = Duration::from_secs(get_validated_arg(&matches, "time"));
+        let exploration = get_validated_arg(&matches, "exploration");
+        let quiet = matches.is_present("quiet");
+
         let oracle = get_validated_arg(&matches, "oracle");
         let oracle_threads = get_validated_arg(&matches, "oracle threads");
         let oracle_iterations =
             get_validated_arg(&matches, "oracle iterations");
         let oracle_timeout = get_validated_arg(&matches, "oracle timeout");
-        let skepticism = get_validated_arg(&matches, "skepticism");
-        let quiet = matches.is_present("quiet");
-        let (heuristic_file_in, heuristic_file_out) =
-            if matches.is_present("disable heuristic") {
-                (None, None)
-            } else {
-                let heuristic_in = OpenOptions::new()
-                    .append(true)
-                    .open("/tmp/lerna-heuristic-in")
-                    .unwrap_or_else(|e| {
-                        log::error!("failed to open heuristic file: {}", e);
-                        os_error()
-                    });
-                let heuristic_out = Mutex::new(BufReader::new(OpenOptions::new()
-                    .read(true)
-                    .open("/tmp/lerna-heuristic-out")
-                    .unwrap_or_else(|e| {
-                        log::error!("failed to open heuristic file: {}", e);
-                        os_error()
-                    })));
-                (Some(heuristic_in), Some(heuristic_out))
-            };
-        let record_file = matches.value_of("record file").map(|path| {
-            OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(path)
-                .unwrap_or_else(|e| {
-                    log::error!("failed to open record file: {}", e);
-                    os_error()
-                })
-        });
+
+        let heuristic_address =
+            get_validated_arg(&matches, "heuristic address");
+        let heuristic_off = matches.is_present("heuristic off");
+
+        let record_file = matches.value_of("record file").map(|x| x.into());
 
         Options {
+            exploration,
             file,
             mode,
-            start_time,
             time,
+            quiet,
             oracle,
             oracle_threads,
             oracle_iterations,
             oracle_timeout,
-            skepticism,
-            heuristic_file_in,
-            heuristic_file_out,
+            heuristic_address,
+            heuristic_off,
             record_file,
-            quiet,
         }
     }
 }

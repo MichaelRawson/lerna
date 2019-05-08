@@ -1,10 +1,11 @@
 use crossbeam::channel::{bounded, unbounded, Receiver, Sender};
 use crossbeam::thread;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::yield_now;
 use unique::Id;
 
 use crate::formula::Formula;
-use crate::heuristic::{deque_heuristic, enqueue_heuristic};
+use crate::heuristic::{receive_from_heuristic, send_to_heuristic};
 use crate::options::OPTIONS;
 use crate::oracle::consult;
 use crate::score::Score;
@@ -12,7 +13,7 @@ use crate::search::Search;
 use crate::status::Status;
 use crate::system::{os_error, within_time};
 
-const MAX_QUEUED: usize = 65536;
+const MAX_QUEUED: usize = 128;
 
 pub struct Prover {
     pub problem: Id<Formula>,
@@ -47,9 +48,14 @@ impl Prover {
                 });
             }
 
-            s.spawn(|_| heuristic_in_task(&running, search2heuristic_receive));
-
-            s.spawn(|_| heuristic_out_task(&running, heuristic2search_send));
+            if !OPTIONS.heuristic_off {
+                s.spawn(|_| {
+                    heuristic_in_task(&running, search2heuristic_receive)
+                });
+                s.spawn(|_| {
+                    heuristic_out_task(&running, heuristic2search_send)
+                });
+            }
 
             let result = search_task(
                 &mut self.search,
@@ -77,8 +83,9 @@ fn oracle_task(
         if let Ok(f) = oracle_in.try_recv() {
             let consultation = consult(&f);
             if oracle_out.send((f, consultation)).is_err() {
-                break;
+                return;
             }
+        } else {
         }
     }
 }
@@ -88,8 +95,12 @@ fn heuristic_in_task(
     heuristic_in: Receiver<Id<Formula>>,
 ) {
     while running.load(Ordering::Relaxed) {
-        while let Ok(f) = heuristic_in.try_recv() {
-            enqueue_heuristic(&f)
+        if let Ok(f) = heuristic_in.try_recv() {
+            while !send_to_heuristic(&f) {
+                yield_now()
+            }
+        } else {
+            yield_now()
         }
     }
 }
@@ -99,39 +110,15 @@ fn heuristic_out_task(
     heuristic_out: Sender<(Id<Formula>, Score)>,
 ) {
     while running.load(Ordering::Relaxed) {
-        let scored = deque_heuristic();
-        if heuristic_out.send(scored).is_err() {
-            return;
-        }
-    }
-}
-
-/*
-fn heuristic_task(
-    running: &AtomicBool,
-    heuristic_in: Receiver<Id<Formula>>,
-    heuristic_out: Sender<(Id<Formula>, Score)>,
-) {
-    while running.load(Ordering::Relaxed) {
-        let mut batch = vec![];
-        while let Ok(f) = heuristic_in.try_recv() {
-            batch.push(f);
-            if batch.len() > BATCH_SIZE {
-                break;
-            }
-        }
-
-        let scores = heuristic(&batch);
-        assert!(scores.len() == batch.len());
-
-        for scored in batch.into_iter().zip(scores.into_iter()) {
+        if let Some(scored) = receive_from_heuristic() {
             if heuristic_out.send(scored).is_err() {
                 return;
             }
+        } else {
+            yield_now();
         }
     }
 }
-*/
 
 pub fn search_task(
     search: &mut Search,
@@ -148,11 +135,14 @@ pub fn search_task(
         } else {
             let new_formulae = search.do_step();
             for f in new_formulae {
-                oracle_send.send(f.clone()).expect("send failed");
-                heuristic_send.send(f).expect("send failed");
+                oracle_send.send(f.clone()).unwrap();
+                if !OPTIONS.heuristic_off {
+                    heuristic_send.send(f).unwrap();
+                }
             }
         }
     }
+    log::info!("done");
 
     search.status()
 }

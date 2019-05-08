@@ -9,7 +9,7 @@ use crate::record::record;
 use crate::score::Score;
 use crate::status::Status;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Node {
     parents: Vec<Id<Formula>>,
     children: Option<Vec<IdSet<Formula>>>,
@@ -18,11 +18,23 @@ pub struct Node {
     visits: usize,
 }
 
+impl Default for Node {
+    fn default() -> Self {
+        Self {
+            parents: vec![],
+            children: None,
+            score: 0.5.into(),
+            status: Status::Unknown,
+            visits: 0,
+        }
+    }
+}
+
 fn uct(parent_visits: usize, child_visits: usize, score: Score) -> Score {
     let parent_visits = parent_visits as f32;
     let child_visits = (child_visits + 1) as f32;
-    let skepticism = OPTIONS.skepticism;
-    (score.0 + (skepticism * parent_visits.ln() / child_visits).sqrt()).into()
+    (score.0 + OPTIONS.exploration * (parent_visits.ln() / child_visits).sqrt())
+        .into()
 }
 
 pub struct Search {

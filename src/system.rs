@@ -1,11 +1,17 @@
+use lazy_static::lazy_static;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::process::exit;
+use std::time::SystemTime;
 use unique::Id;
 
 use crate::formula::Formula;
 use crate::options::OPTIONS;
 use crate::output::tptp;
+
+lazy_static! {
+    static ref START_TIME: SystemTime = SystemTime::now();
+}
 
 fn logical_data_id() -> &'static str {
     Path::new(&OPTIONS.file)
@@ -48,7 +54,7 @@ pub fn unsatisfiable(lemmas: Vec<Id<Formula>>) -> ! {
     println!("% SZS output start Refutation for {}", id);
     for lemma in &lemmas {
         tptp::write_statement(&mut std::io::stdout(), lemma)
-            .expect("writing lemma to stdout failed");
+            .expect("writing statement to stdout failed");
     }
     println!("% SZS output end Refutation for {}", id);
     exit(0)
@@ -61,6 +67,10 @@ pub fn check_for_timeout() {
 }
 
 pub fn within_time() -> bool {
-    let elapsed = OPTIONS.start_time.elapsed().unwrap_or_default();
+    let elapsed = START_TIME.elapsed().unwrap_or_default();
     elapsed < OPTIONS.time
+}
+
+pub fn initialize() {
+    lazy_static::initialize(&START_TIME);
 }

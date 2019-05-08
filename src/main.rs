@@ -74,8 +74,12 @@ fn run_prover(simplified: Id<Formula>) {
 }
 
 fn main() {
+    system::initialize();
     options::initialize();
     logging::initialize();
+    heuristic::initialize();
+    record::initialize();
+
     check_for_timeout();
 
     let loaded = load();
