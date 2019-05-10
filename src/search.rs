@@ -39,7 +39,7 @@ fn uct(parent_visits: usize, child_visits: usize, score: Score) -> Score {
 
 pub struct Search {
     root: Id<Formula>,
-    nodes: HashMap<Id<Formula>, Node>,
+    pub nodes: HashMap<Id<Formula>, Node>,
 }
 
 impl Search {

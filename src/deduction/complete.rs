@@ -100,6 +100,29 @@ fn complete(
                     deduced.insert(combined);
                 }
             }
+
+            let classes = ps
+                .into_iter()
+                .filter_map(|f| match **f {
+                    Eq(ref ts) => Some((f, ts.as_ref())),
+                    _ => None,
+                })
+                .map(|(p, class)| (p, &class[0], &class[1..]));
+            for (p, minimum, class) in classes {
+                let rest = ps
+                    .without(p)
+                    .into_iter()
+                    .map(|f| {
+                        let mut f = f;
+                        for t in class {
+                            f = Formula::replace(&f, t, minimum);
+                        }
+                        f
+                    })
+                    .chain(std::iter::once(p.clone()))
+                    .collect();
+                deduced.insert(idset![Id::new(And(rest))]);
+            }
         }
         Eqv(ref ps) => {
             for (p, q) in ps.pairs() {

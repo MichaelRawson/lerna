@@ -142,7 +142,6 @@ pub fn search_task(
             }
         }
     }
-    log::info!("done");
 
     search.status()
 }
